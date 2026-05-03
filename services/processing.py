@@ -104,44 +104,6 @@ def process_song(song: Dict, fetcher: LyricFetcher) -> Dict:
 
 
 # ==========================
-# BATCH PROCESSING (PIPELINE READY)
-# ==========================
-def process_songs(songs: List[Dict]):
-    """
-    Generator for streaming pipeline
-
-    Yields events instead of returning full result
-    """
-
-    fetcher = LyricFetcher()
-
-    yield {
-        "type": "log",
-        "content": "fetching lyrics..."
-    }
-
-    for i, song in enumerate(songs):
-
-        yield {
-            "type": "log",
-            "content": f"processing {song.get('track_name')}..."
-        }
-
-        enriched = process_song(song, fetcher)
-
-        yield {
-            "type": "lyrics",
-            "data": enriched,
-            "index": i
-        }
-
-    yield {
-        "type": "log",
-        "content": "lyrics processing complete"
-    }
-
-
-# ==========================
 # OPTIONAL: NON-STREAM MODE
 # ==========================
 def process_songs_batch(songs: List[Dict]) -> List[Dict]:

@@ -117,10 +117,3 @@ def map_profile_answer_to_state(choice: str, question_data: Dict) -> str:
     question = question_data.get("question", "")
     option_text = question_data.get("options", {}).get(choice, "Unknown")
     return f"In their profile overview, user was asked '{question}' and admitted: '{option_text}'"
-
-# DEPRECATED LEGACY FUNCTIONS (kept for compatibility during transition if needed)
-def build_question_data(lyrics: str) -> Dict:
-    return {"question": "Deperecated", "options": {"A": "Yes", "B": "No"}}
-
-def build_profile_question_module(songs: List[Dict]) -> Dict:
-    return {"question": "Deprecated", "options": {"A": "Yes", "B": "No"}}
