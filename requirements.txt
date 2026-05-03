@@ -9,7 +9,7 @@ spotipy==2.22.1
 requests==2.31.0
 
 # Lyrics API
-lrclibapi==0.3.1
+#lrclib==0.3.1
 
 # AI APIs
 groq==0.5.0
