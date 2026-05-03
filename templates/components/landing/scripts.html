@@ -1,0 +1,249 @@
+<script>
+const btn = document.getElementById("mainBtn");
+const userTitle = document.getElementById("userTitle");
+
+// =======================
+// AUTH CHECK
+// =======================
+async function checkAuth() {
+    if (!btn) return;
+    try {
+        const res = await fetch("/auth-status");
+        const data = await res.json();
+
+        if (!data.authenticated) {
+            btn.textContent = "[ LOGIN TO SPOTIFY ]";
+            btn.onclick = () => {
+                window.location.href = "/login";
+            };
+        } else {
+            btn.textContent = "[ START ANALYSIS ]";
+            await setUserName();
+            btn.onclick = () => {
+                startAnalysis();
+            };
+        }
+    } catch (e) {
+        console.error("Auth check failed:", e);
+        btn.textContent = "[ LOGIN TO SPOTIFY ]";
+        btn.onclick = () => window.location.href = "/login";
+    }
+}
+
+async function setUserName() {
+    try {
+        const res = await fetch("/me");
+        const data = await res.json();
+
+        if (data.display_name) {
+            const name = data.display_name.split(" ")[0];
+            if (userTitle) userTitle.textContent = `${name}'s music.`;
+            sessionStorage.setItem('userName', data.display_name);
+        }
+        
+        if (data.image) {
+            sessionStorage.setItem('userImage', data.image);
+        }
+    } catch (e) {
+        console.error("Failed to set user name:", e);
+    }
+}
+
+checkAuth();
+
+// =======================
+// ANALYSIS FLOW
+// =======================
+let isRunning = false;
+const collectionOverlay = document.getElementById("collectionOverlay");
+const collectionList = document.getElementById("collectionList");
+
+async function startAnalysis() {
+    if (isRunning) return;
+    openCollectionSelector();
+}
+
+async function openCollectionSelector() {
+    if (!collectionOverlay || !collectionList) return;
+    collectionOverlay.style.display = 'flex';
+    collectionList.innerHTML = '<div class="loading-text">FETCHING COLLECTIONS...</div>';
+    
+    try {
+        const res = await fetch("/get-collections");
+        if (res.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+        
+        const data = await res.json();
+        if (res.status === 403 && data.error === 'insufficient_scope') {
+            alert("New permissions are required. Logging out...");
+            window.location.href = "/logout";
+            return;
+        }
+        
+        if (data.error) throw new Error(data.error);
+        
+        collectionList.innerHTML = '';
+        
+        // 1. Liked Songs
+        const likedItem = document.createElement('div');
+        likedItem.className = 'collection-item';
+        likedItem.onclick = () => selectCollection('liked', 'Liked Songs');
+        likedItem.innerHTML = `
+            <div class="collection-img" style="display:flex;align-items:center;justify-content:center;font-size:24px;">❤️</div>
+            <div class="collection-info">
+                <h4>Liked Songs</h4>
+                <p>${data.liked_total} TRACKS</p>
+            </div>
+        `;
+        collectionList.appendChild(likedItem);
+        
+        // 2. Playlists
+        data.playlists.forEach(pl => {
+            const item = document.createElement('div');
+            item.className = 'collection-item';
+            item.onclick = () => selectCollection(pl.id, pl.name);
+            item.innerHTML = `
+                <img class="collection-img" src="${pl.image || 'https://placehold.co/50'}" alt="${pl.name}">
+                <div class="collection-info">
+                    <h4>${pl.name}</h4>
+                    <p>${pl.total} TRACKS</p>
+                </div>
+            `;
+            collectionList.appendChild(item);
+        });
+        
+    } catch (e) {
+        collectionList.innerHTML = `<div class="loading-text" style="color:red">ERROR: ${e.message}</div>`;
+    }
+}
+
+function closeCollectionSelector() {
+    if (collectionOverlay) collectionOverlay.style.display = 'none';
+}
+
+async function selectCollection(id, name) {
+    if (isRunning) return;
+    isRunning = true;
+    
+    closeCollectionSelector();
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "[ INITIATING... ]";
+    }
+
+    try {
+        // 1️⃣ FETCH SONGS FROM COLLECTION
+        const res = await fetch("/fetch-collection-songs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ collection_id: id, collection_name: name })
+        });
+        
+        const data = await res.json();
+        
+        if (res.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (res.status !== 200 || !data.data || data.data.length === 0) {
+            throw new Error(data.message || "No tracks found in this collection.");
+        }
+
+        if (btn) btn.textContent = "[ PROCESSING LYRICS... ]";
+
+        // 2️⃣ FETCH LYRICS + EMOTION
+        const lyricsRes = await fetch("/fetch-lyrics", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ songs: data.data })
+        });
+        
+        if (lyricsRes.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        const enrichedData = await lyricsRes.json();
+        
+        if (!enrichedData.data || enrichedData.data.length === 0) {
+            throw new Error("Lyric enrichment returned no data.");
+        }
+        
+        // Store for analysis page
+        sessionStorage.removeItem('os_events');
+        sessionStorage.setItem('enrichedSongs', JSON.stringify(enrichedData.data));
+        sessionStorage.setItem('os_collection_name', name);
+        
+        if (btn) btn.textContent = "[ REDIRECTING... ]";
+        window.location.href = "/analysis";
+
+    } catch (err) {
+        console.error(err);
+        alert("CRITICAL_ERROR: " + err.message);
+        resetBtn();
+    }
+}
+
+function resetBtn() {
+    isRunning = false;
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = "[ START ANALYSIS ]";
+    }
+}
+
+// =======================
+// THEME SWITCHER
+// =======================
+const themeToggle = document.getElementById('themeToggle');
+const body = document.body;
+
+function setTheme(theme) {
+    if (theme === 'light') {
+        body.classList.add('light-mode');
+        if (themeToggle) themeToggle.textContent = '[ THEME: LIGHT ]';
+        localStorage.setItem('theme', 'light');
+    } else {
+        body.classList.remove('light-mode');
+        if (themeToggle) themeToggle.textContent = '[ THEME: DARK ]';
+        localStorage.setItem('theme', 'dark');
+    }
+}
+
+if (themeToggle) {
+    themeToggle.onclick = () => {
+        const isLight = body.classList.contains('light-mode');
+        setTheme(isLight ? 'dark' : 'light');
+    };
+}
+
+const savedTheme = localStorage.getItem('theme') || 'dark';
+setTheme(savedTheme);
+
+// =======================
+// GLOBAL BACKGROUND
+// =======================
+function generateGlobalBackground() {
+    const bg = document.getElementById('globalBg');
+    if (!bg) return;
+    
+    bg.innerHTML = '';
+    const icons = ['🐱', '💉', '🔧', '🚀', '☮️', '👤', '🎹', '🧬', '⚡', '🎵', '💿', '🎹', '🎸', '🎧'];
+    for(let i=0; i<40; i++) {
+        const span = document.createElement('span');
+        span.textContent = icons[Math.floor(Math.random() * icons.length)];
+        span.style.left = Math.random() * 100 + '%';
+        span.style.top = Math.random() * 100 + '%';
+        span.style.fontSize = (Math.random() * 30 + 15) + 'px';
+        span.style.transform = `rotate(${Math.random() * 360}deg)`;
+        span.style.opacity = Math.random() * 0.5 + 0.3;
+        bg.appendChild(span);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', generateGlobalBackground);
+
+</script>

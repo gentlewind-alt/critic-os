@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRITIC_OS</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;500&family=Inter:wght@300;600&display=swap" rel="stylesheet">
+
+<style>
+/* =========================
+   GLOBAL
+========================= */
+body {
+  margin: 0;
+  background: #f5f5f2;
+  color: #111;
+  font-family: 'Inter', sans-serif;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+/* =========================
+   HEADER
+========================= */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 60px;
+}
+
+.nav {
+  display: flex;
+  gap: 30px;
+}
+
+.nav span {
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.nav span:hover {
+  opacity: 1;
+}
+
+/* watermark */
+.watermark {
+  position: fixed;
+  top: 15px;
+  left: 20px;
+  font-size: 10px;
+  opacity: 0.3;
+}
+
+/* =========================
+   HERO
+========================= */
+.hero small {
+  font-size: 12px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+
+.hero h1 {
+  font-size: 64px;
+  margin: 10px 0 0;
+}
+
+.hero h2 {
+  font-size: 64px;
+  font-style: italic;
+  font-weight: 300;
+  margin: 0;
+  color: #888;
+}
+
+.hero p {
+  margin-top: 20px;
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.buttons {
+  margin-top: 30px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 24px;
+  border: 1px solid #111;
+  margin: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.btn:hover {
+  background: #111;
+  color: #fff;
+}
+
+/* =========================
+   SIDE PANELS
+========================= */
+.side {
+  position: absolute;
+  top: 260px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.left {
+  left: 40px;
+}
+
+.right {
+  right: 40px;
+}
+
+.side p {
+  margin: 5px 0;
+  opacity: 0.7;
+}
+
+/* =========================
+   COVERFLOW
+========================= */
+.coverflow {
+  margin-top: 80px;
+  perspective: 1000px;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track {
+  display: flex;
+  transition: transform 0.8s ease;
+}
+
+.track img {
+  width: 160px;
+  margin: 0 -40px;
+  transition: all 0.6s ease;
+  border-radius: 8px;
+}
+
+/* states */
+.active {
+  transform: scale(1.2) rotateY(0deg);
+  z-index: 10;
+}
+
+.left-item {
+  transform: rotateY(50deg) scale(0.9);
+  opacity: 0.6;
+}
+
+.right-item {
+  transform: rotateY(-50deg) scale(0.9);
+  opacity: 0.6;
+}
+
+/* =========================
+   FOOTER
+========================= */
+.footer {
+  margin-top: 60px;
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+  opacity: 0.6;
+}
+
+.center-icon {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 24px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="watermark mono">A project by Samarth _</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header mono">
+    <div>CRITIC_OS.v1.0.4</div>
+    <div class="nav">
+      <span>ANALYZE</span>
+      <span>LOGS</span>
+      <span>ARCHIVE</span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <small class="mono">// WELCOME TO CRITIC_OS</small>
+    <h1>Your music.</h1>
+    <h2>Fully analyzed.</h2>
+
+    <p class="mono">
+      Advanced behavioral analysis of your listening patterns.<br>
+      No sugarcoating. Just pure insight.
+    </p>
+
+    <div class="buttons mono">
+      <div class="btn">[ START ANALYSIS ] →</div>
+    </div>
+  </div>
+
+  <!-- COVERFLOW -->
+  <div class="coverflow">
+    <div class="track" id="track">
+      <img src="https://i.scdn.co/image/ab67616d0000b273f0e7d4c6f7bdb5f3a5d16d79">
+      <img src="https://i.scdn.co/image/ab67616d0000b273e9d8f7ec1a48d40c88001cc8">
+      <img src="https://i.scdn.co/image/ab67616d0000b2739e3d0d17a1c89eacdd5b43b3">
+      <img src="https://i.scdn.co/image/ab67616d0000b273ce8b2c9fbd9c1e8152ef749b">
+      <img src="https://i.scdn.co/image/ab67616d0000b2734bafc0d6c3b9c6a9c6e3e3c1">
+    </div>
+  </div>
+
+  <!-- ASCII FACE -->
+  <div class="center-icon mono">
+    [ -_- ]
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer mono">
+    <div>AUTOMATED RESPONSE SYSTEM v1.0.4 - BETA</div>
+    <div>
+      SESSION: GUEST<br>
+      MODE: STANDARD<br>
+      DATA INTEGRITY: 100%
+    </div>
+  </div>
+
+</div>
+
+<script>
+const track = document.getElementById("track");
+let index = 2;
+
+function update() {
+  const items = track.children;
+  for (let i = 0; i < items.length; i++) {
+    items[i].className = "";
+    if (i === index) items[i].classList.add("active");
+    else if (i < index) items[i].classList.add("left-item");
+    else items[i].classList.add("right-item");
+  }
+}
+
+function next() {
+  index = (index + 1) % track.children.length;
+  update();
+}
+
+setInterval(next, 2500);
+update();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,126 @@
+# app/services/interaction.py
+
+import re
+import random
+import logging
+import os
+import json
+from typing import List, Dict, Optional
+from groq import Groq
+
+logger = logging.getLogger(__name__)
+
+# Groq client for AI-driven questions
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+# ==========================
+# PERSONA PROMPTS (QUESTIONS)
+# ==========================
+QUESTION_PERSONA_PROMPTS = {
+    "normal": "You are a brutally honest best friend. Ask a short, sharp question about why they like this specific vibe.",
+    "cat": "You are a judgmental house cat. Hiss, meow, and ask a condescending question about why they are listening to this trash.",
+    "grandpa": "You are a grumpy, old-fashioned grandfather. Complain about 'kids these days' or 'this racket' and ask a judgmental question about why they aren't listening to real music (from the 50s-70s)."
+}
+
+# ==========================
+# AI QUESTION GENERATION
+# ==========================
+
+def generate_ai_question(song: Dict, persona: str = "normal", history: List[str] = None) -> Dict:
+    """Uses Groq to generate a unique, context-aware question."""
+    track = song.get("track_name", "Unknown")
+    artist = song.get("artist_name", "Unknown")
+    emotions = ", ".join(song.get("Emotion", ["neutral"]))
+    lyrics = song.get("plain_lyrics", "")[:500]
+    
+    history_str = "\n".join([f"- {h}" for h in history]) if history else "None"
+    persona_prompt = QUESTION_PERSONA_PROMPTS.get(persona, QUESTION_PERSONA_PROMPTS["normal"])
+
+    prompt = f"""{persona_prompt}
+Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyrics, ask ONE short question (max 15 words) to the user.
+
+### PREVIOUS INTERACTION CONTEXT
+{history_str}
+
+### LYRICS
+{lyrics}
+
+### RULES
+1. DO NOT repeat themes from the previous interaction context.
+2. Provide two short options (A and B).
+3. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}}}
+"""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.8,
+            max_tokens=100,
+            response_format={"type": "json_object"}
+        )
+        data = json.loads(response.choices[0].message.content)
+        return data
+    except Exception as e:
+        logger.error(f"AI Question Gen Error: {e}")
+        # Fallback to a semi-dynamic question if AI fails
+        return {
+            "question": f"Is this {emotions} vibe actually helping your mood?",
+            "options": {"A": "Yes", "B": "Not really"}
+        }
+
+def generate_profile_ai_question(songs: List[Dict], persona: str = "normal") -> Dict:
+    """Generates an AI question for the overall profile."""
+    summary = [f"- {s.get('track_name')} ({', '.join(s.get('Emotion', []))})" for s in songs[:5]]
+    persona_prompt = QUESTION_PERSONA_PROMPTS.get(persona, QUESTION_PERSONA_PROMPTS["normal"])
+
+    prompt = f"""{persona_prompt}
+Analyze this user's overall vibe and ask ONE deep (but sarcastic) question about their personality.
+
+### RECENT TRACKS
+{chr(10).join(summary)}
+
+### RULES
+1. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}}}
+2. MAXIMUM 20 WORDS.
+"""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.9,
+            max_tokens=100,
+            response_format={"type": "json_object"}
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"AI Profile Question Error: {e}")
+        return {
+            "question": "Is your music taste a cry for help or just bad luck?",
+            "options": {"A": "Cry for help", "B": "Bad luck"}
+        }
+
+# ==========================
+# MAPPING HELPERS
+# ==========================
+
+def map_answer_to_state(choice: str, question_data: Dict) -> str:
+    """Converts a choice into a descriptive string for the AI roast context."""
+    question = question_data.get("question", "")
+    option_text = question_data.get("options", {}).get(choice, "Unknown")
+    return f"User was asked '{question}' and answered '{option_text}'"
+
+def map_profile_answer_to_state(choice: str, question_data: Dict) -> str:
+    """Convert user profile response into a grounded state."""
+    question = question_data.get("question", "")
+    option_text = question_data.get("options", {}).get(choice, "Unknown")
+    return f"In their profile overview, user was asked '{question}' and admitted: '{option_text}'"
+
+# DEPRECATED LEGACY FUNCTIONS (kept for compatibility during transition if needed)
+def build_question_data(lyrics: str) -> Dict:
+    return {"question": "Deperecated", "options": {"A": "Yes", "B": "No"}}
+
+def build_profile_question_module(songs: List[Dict]) -> Dict:
+    return {"question": "Deprecated", "options": {"A": "Yes", "B": "No"}}

@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+venv/
+one-million-reddit-jokes.csv
+mistral-4bit-local/
+.vscode/

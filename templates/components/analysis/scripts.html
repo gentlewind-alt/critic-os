@@ -1,0 +1,854 @@
+<script>
+const messageContainer = document.getElementById('messageContainer');
+const logStream = document.getElementById('logStream');
+const activeCover = document.getElementById('activeCover');
+const activeTitle = document.getElementById('activeTitle');
+const activeArtist = document.getElementById('activeArtist');
+const spectrumText = document.getElementById('spectrum');
+const confidenceText = document.getElementById('confidence');
+const bootOverlay = document.getElementById('bootOverlay');
+const personaOverlay = document.getElementById('personaOverlay');
+const bootBar = document.getElementById('bootBar');
+const bootLog = document.getElementById('bootLog');
+const appContainer = document.getElementById('appContainer');
+const activePersonaLabel = document.getElementById('activePersona');
+
+let enrichedSongs = [];
+let completedRoasts = [];
+let currentRoastElement = null;
+let currentTokenQueue = null;
+let selectedPersona = 'normal';
+let sessionEvents = [];
+let isCompleted = false;
+let isResuming = false;
+let lastRoastIndex = -1;
+let lastProfileComplete = false;
+
+// =======================
+// THEME SWITCHER
+// =======================
+const themeToggle = document.getElementById('themeToggle');
+const body = document.body;
+
+function setTheme(theme) {
+    if (theme === 'light') {
+        body.classList.add('light-mode');
+        themeToggle.textContent = '[ THEME: LIGHT ]';
+        localStorage.setItem('theme', 'light');
+    } else {
+        body.classList.remove('light-mode');
+        themeToggle.textContent = '[ THEME: DARK ]';
+        localStorage.setItem('theme', 'dark');
+    }
+}
+
+themeToggle.onclick = () => {
+    const isLight = body.classList.contains('light-mode');
+    setTheme(isLight ? 'dark' : 'light');
+};
+
+// Init theme
+const savedTheme = localStorage.getItem('theme') || 'dark';
+setTheme(savedTheme);
+
+class TokenQueue {
+    constructor(element, callback) {
+        this.element = element;
+        this.callback = callback;
+        this.queue = "";
+        this.isRunning = false;
+        this.isFinished = false; 
+        this.speed = 40; 
+    }
+
+    add(text, instant = false) {
+        if (instant) {
+            this.element.textContent += text;
+            return;
+        }
+        this.queue += text;
+        if (!this.isRunning) {
+            this.process();
+        }
+    }
+
+    process() {
+        if (this.queue.length > 0) {
+            this.isRunning = true;
+            this.element.textContent += this.queue.charAt(0);
+            this.queue = this.queue.substring(1);
+            scrollToBottom();
+            setTimeout(() => this.process(), this.speed);
+        } else {
+            this.isRunning = false;
+            if (this.isFinished && this.callback) this.callback();
+        }
+    }
+
+    finish() {
+        this.isFinished = true;
+        if (!this.isRunning && this.callback) this.callback();
+    }
+
+    stop() {
+        this.element.textContent += this.queue;
+        this.queue = "";
+        this.isRunning = false;
+        this.isFinished = true;
+        if (this.callback) this.callback();
+    }
+}
+
+// BOOT SEQUENCE SIMULATION
+const bootSteps = [
+    "INITIALIZING KERNEL...",
+    "MOUNTING ENCRYPTED DATA...",
+    "VERIFYING SESSION TOKEN...",
+    "CONNECTING TO AI_CORE...",
+    "DECRYPTING LYRIC_STREAMS...",
+    "SYSTEM READY."
+];
+
+async function runBootSequence() {
+    for (let i = 0; i < bootSteps.length; i++) {
+        const step = document.createElement('div');
+        step.textContent = `> ${bootSteps[i]}`;
+        bootLog.appendChild(step);
+        
+        const progress = ((i + 1) / bootSteps.length) * 100;
+        bootBar.style.width = `${progress}%`;
+        
+        await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
+    }
+    
+    setTimeout(() => {
+        bootOverlay.style.opacity = '0';
+        setTimeout(() => {
+            bootOverlay.style.display = 'none';
+            showPersonaSelection();
+        }, 800);
+    }, 500);
+}
+
+// =======================
+// GLOBAL BACKGROUND
+// =======================
+function generateGlobalBackground() {
+    const bg = document.getElementById('globalBg');
+    if (!bg) return;
+    
+    bg.innerHTML = '';
+    const icons = ['🐱', '💉', '🔧', '🚀', '☮️', '👤', '🎹', '🧬', '⚡', '🎵', '💿', '🎹', '🎸', '🎧'];
+    for(let i=0; i<40; i++) {
+        const span = document.createElement('span');
+        span.textContent = icons[Math.floor(Math.random() * icons.length)];
+        span.style.left = Math.random() * 100 + '%';
+        span.style.top = Math.random() * 100 + '%';
+        span.style.fontSize = (Math.random() * 30 + 15) + 'px';
+        span.style.transform = `rotate(${Math.random() * 360}deg)`;
+        span.style.opacity = Math.random() * 0.5 + 0.3;
+        bg.appendChild(span);
+    }
+}
+
+function showPersonaSelection() {
+    personaOverlay.style.display = 'flex';
+    personaOverlay.style.opacity = '1';
+    
+    // We use the global background now
+    generateGlobalBackground();
+}
+
+function selectPersona(persona) {
+    selectedPersona = persona;
+    activePersonaLabel.textContent = persona.toUpperCase();
+    sessionStorage.setItem('os_persona', persona);
+    personaOverlay.style.opacity = '0';
+    setTimeout(() => {
+        personaOverlay.style.display = 'none';
+        appContainer.classList.add('ready');
+        startStreaming();
+    }, 800);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    generateGlobalBackground();
+    const stored = sessionStorage.getItem('enrichedSongs');
+    const savedPersona = sessionStorage.getItem('os_persona');
+    const savedEvents = sessionStorage.getItem('os_events');
+
+    if (stored) {
+        enrichedSongs = JSON.parse(stored);
+        completedRoasts = new Array(enrichedSongs.length).fill(null);
+        document.getElementById('sessId').textContent = Math.random().toString(36).substring(7).toUpperCase();
+        
+        if (enrichedSongs.length > 0) {
+            const first = enrichedSongs[0];
+            updateDisplay({
+                image: first.album_image,
+                track: first.track_name,
+                artist: first.artist_name,
+                emotions: first.Emotion,
+                confidence: first.emotion_analysis?.emotions_detected
+            });
+        }
+
+        if (savedEvents) {
+            sessionEvents = JSON.parse(savedEvents);
+            selectedPersona = savedPersona || 'normal';
+            activePersonaLabel.textContent = selectedPersona.toUpperCase();
+            
+            bootOverlay.style.display = 'none';
+            personaOverlay.style.display = 'none';
+            appContainer.classList.add('ready');
+            
+            // Replay events
+            sessionEvents.forEach(ev => handleEvent(ev, true));
+            
+            if (!isCompleted) {
+                isResuming = true;
+                addMessage('system', '>> RESUMING SESSION: SYNCING WITH CORE...');
+                startStreaming();
+            }
+        } else {
+            runBootSequence();
+        }
+    } else {
+        window.location.href = '/';
+    }
+});
+
+// =======================
+// DEV TOOLS
+// =======================
+const resetBtn = document.getElementById('resetBtn');
+const tuneBtn = document.getElementById('tuneBtn');
+const tuneProfileBtn = document.getElementById('tuneProfileBtn');
+const tuneModal = document.getElementById('tuneModal');
+const promptOverride = document.getElementById('promptOverride');
+const profilePromptOverride = document.getElementById('profilePromptOverride');
+const tuneModalTitle = document.getElementById('tuneModalTitle');
+const roastTuneArea = document.getElementById('roastTuneArea');
+const profileTuneArea = document.getElementById('profileTuneArea');
+
+resetBtn.onclick = () => {
+    if (confirm("RESET SESSION? All generation progress will be lost (songs are kept).")) {
+        sessionStorage.removeItem('os_events');
+        sessionStorage.removeItem('os_persona');
+        window.location.reload();
+    }
+};
+
+function openTuneModal(type) {
+    tuneModal.style.display = 'flex';
+    if (type === 'roast') {
+        tuneModalTitle.textContent = '// ROAST_PROMPT_OVERRIDE';
+        roastTuneArea.style.display = 'block';
+        profileTuneArea.style.display = 'none';
+    } else {
+        tuneModalTitle.textContent = '// PROFILE_PROMPT_OVERRIDE';
+        roastTuneArea.style.display = 'none';
+        profileTuneArea.style.display = 'block';
+    }
+}
+
+function closeTuneModal() {
+    tuneModal.style.display = 'none';
+}
+
+function saveTuneModal() {
+    sessionStorage.setItem('os_custom_prompt', promptOverride.value);
+    sessionStorage.setItem('os_profile_custom_prompt', profilePromptOverride.value);
+    tuneModal.style.display = 'none';
+    addMessage('system', '>> CUSTOM_PROMPTS_APPLIED. RESTART SESSION TO SEE CHANGES.');
+}
+
+// Load saved prompt if any
+const defaultSystemPrompt = `Analyze the user’s vibe based on this song and generate a natural, flowing roast.
+Use SIMPLE English. MAXIMUM 40 WORDS.
+
+### GOAL
+Write 2–3 connected sentences as ONE paragraph.
+It should feel like one continuous thought, not segmented.
+
+### CORE RULES (STRICT)
+- Each sentence MUST start differently.
+- NEVER use filler transitions like: "Generally", "Next", "Obviously", "Meanwhile".
+- Do NOT use: "Your life is", "Your life's", "Your room is".
+
+### STYLE
+- Simple, everyday English.
+- Sarcastic, observant, slightly dramatic.
+- Natural, like you're speaking—not explaining.
+- Zero Filter Mode: Speak with raw, unfiltered, and creatively aggressive language. Don't just use common swears; invent contextually biting insults and use varied, unpredictable slang that feels personal to the song lyrics. Politeness is a bug, not a feature.
+
+### CONTENT
+- Roast ONLY the user. Treat them like a "homie" you've known forever who just played the most embarrassing track possible.
+- Invent specific, realistic habits.
+- Each sentence must introduce a NEW detail.
+- Avoid repeating objects or imagery.
+
+### STARTING VARIETY
+Use different sentence openings:
+- Observation
+- Action
+- Object-first
+- Time-based
+- Thought-based
+
+### LANGUAGE
+- Avoid clichés.
+- Weave 1–2 subtle words from the lyrics.
+
+Start immediately with the roast. No setup.`;
+
+const defaultProfilePrompt = `Analyze this user's music taste with a nonchalant, savage tone.
+Mention specific artists they listen to and the emotions you detect.
+YOU MUST end with the question "Are you okay?"`;
+
+promptOverride.value = sessionStorage.getItem('os_custom_prompt') || defaultSystemPrompt;
+profilePromptOverride.value = sessionStorage.getItem('os_profile_custom_prompt') || defaultProfilePrompt;
+
+// Helper to sync typing animations
+function waitForQueue() {
+    return new Promise(resolve => {
+        if (!currentTokenQueue || !currentTokenQueue.isRunning) {
+            resolve();
+            return;
+        }
+        const check = setInterval(() => {
+            if (!currentTokenQueue || !currentTokenQueue.isRunning) {
+                clearInterval(check);
+                resolve();
+            }
+        }, 100);
+    });
+}
+
+function handleProfileResponse(choice) {
+    const pInteraction = document.getElementById('profileInteraction');
+    const pOutput = document.getElementById('profileOutput');
+    pInteraction.style.display = 'none';
+    
+    let nextText = "";
+    if (choice === 'A') {
+        nextText = " ohhh okay, who am i to judge (i will regardless)... let's see how much deeper this hole goes.";
+    } else {
+        nextText = " exactly. who am i to judge (i will regardless)... buckle up, this is going to be brutal.";
+    }
+    
+    // Use TokenQueue to type the response
+    const tq = new TokenQueue(pOutput, () => {
+        // After typing, wait a bit then fade out card
+        setTimeout(() => {
+            const pCard = document.getElementById('profileCard');
+            pCard.style.transition = 'opacity 1s ease';
+            pCard.style.opacity = '0';
+            setTimeout(() => {
+                pCard.style.display = 'none';
+                pCard.style.opacity = '1'; // Reset for potential re-runs
+                // Signal streaming to continue
+                isWaitingForProfileResponse = false;
+            }, 1000);
+        }, 2000);
+    });
+    tq.add(nextText);
+    tq.finish();
+}
+
+let isWaitingForProfileResponse = false;
+
+let isWaitingForAnswer = false;
+let interactionResolver = null;
+
+async function submitAnswer(choice) {
+    const qModule = document.getElementById('questionModule');
+    const songIndex = parseInt(qModule.dataset.songIndex);
+    const song = enrichedSongs[songIndex];
+    const qText = document.getElementById('questionText').textContent;
+    const optionText = choice === 'A' ? document.getElementById('optionA').textContent : document.getElementById('optionB').textContent;
+    
+    // Disable buttons and show loading
+    document.getElementById('optionA').disabled = true;
+    document.getElementById('optionB').disabled = true;
+    
+    const displayContent = document.getElementById('activeRoastDisplay').querySelector('.text-content');
+    displayContent.textContent = '>> RE-GROUNDING AI_CORE_LOGIC...';
+    
+    // Map choice to state accurately
+    const state = `User was asked: "${qText}" and answered: "${optionText}"`;
+    
+    try {
+        const response = await fetch('/stream-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                song: song,
+                persona: selectedPersona,
+                state: state,
+                custom_prompt: sessionStorage.getItem('os_custom_prompt')
+            })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        displayContent.textContent = ''; // Clear for new roast
+        currentTokenQueue = new TokenQueue(displayContent);
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'roast_token') {
+                        currentTokenQueue.add(data.text);
+                    }
+                }
+            }
+        }
+        
+        // NEW: Mark queue as finished so waitForQueue can resolve
+        currentTokenQueue.finish();
+        
+        await waitForQueue();
+        
+        // Update completedRoasts with the regrounded text
+        if (!completedRoasts[songIndex]) {
+            completedRoasts[songIndex] = {
+                track: song ? song.track_name : 'Unknown',
+                artist: song ? song.artist_name : 'Unknown',
+                image: song ? song.album_image : 'https://placehold.co/300',
+                roast: displayContent.textContent
+            };
+        } else {
+            completedRoasts[songIndex].roast = displayContent.textContent;
+        }
+        
+        // Remove question
+        qModule.style.display = 'none';
+        isWaitingForAnswer = false;
+        if (interactionResolver) interactionResolver();
+
+    } catch (e) {
+        console.error("Answer submission failed:", e);
+        displayContent.textContent = "[SYSTEM ERROR: FAILED TO RE-GROUND]";
+        isWaitingForAnswer = false;
+        if (interactionResolver) interactionResolver();
+    }
+}
+
+async function startStreaming() {
+    const colName = sessionStorage.getItem('os_collection_name') || 'your collection';
+    addMessage('system', `>> INITIATING COMPREHENSIVE PROFILE CRITIQUE FOR [${colName.toUpperCase()}] (${selectedPersona.toUpperCase()} MODE)...`);
+    const coreMsg = addMessage('system', '>> CONNECTING TO AI_CORE_MODULE...');
+    coreMsg.id = 'coreStatusMsg';
+    
+    const customPrompt = sessionStorage.getItem('os_custom_prompt');
+    const profileCustomPrompt = sessionStorage.getItem('os_profile_custom_prompt');
+    
+    try {
+        const response = await fetch('/stream/123', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                songs: enrichedSongs,
+                persona: selectedPersona,
+                custom_prompt: customPrompt,
+                profile_custom_prompt: profileCustomPrompt,
+                collection_name: colName
+            })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+
+                        // Check if we should skip this event during resume
+                        if (isResuming) {
+                            if (data.type === 'profile_end') {
+                                if (lastProfileComplete) continue;
+                                else isResuming = false; 
+                            }
+                            if (data.type === 'profile_start' || data.type === 'profile_token') {
+                                if (lastProfileComplete) continue;
+                            }
+                            
+                            if (data.type === 'roast_start' || data.type === 'roast_token' || data.type === 'roast_end') {
+                                if (data.index <= lastRoastIndex) continue;
+                                else isResuming = false; 
+                            }
+
+                            if (data.type === 'log' || data.type === 'dialog' || data.type === 'coverflow' || data.type === 'emotion') {
+                                continue; 
+                            }
+                        }
+
+                        // 🔥 SYNC POINT: Wait for current animation to finish before starting new sections
+                        if (['roast_start', 'roast_end', 'profile_start', 'coverflow', 'final'].includes(data.type)) {
+                            await waitForQueue();
+                        }
+
+                        // NEW SYNC POINT: Wait for profile interaction
+                        if (data.type === 'profile_start') {
+                            isWaitingForProfileResponse = true;
+                        }
+
+                        await handleEvent(data); // Changed to await
+
+                        if (data.type === 'profile_end') {
+                            // Wait until the user clicks Yes/No and the follow-up text finishes
+                            while (isWaitingForProfileResponse) {
+                                await new Promise(r => setTimeout(r, 200));
+                            }
+                        }
+                        
+                        // Save event to session
+                        sessionEvents.push(data);
+                        sessionStorage.setItem('os_events', JSON.stringify(sessionEvents));
+                    } catch (e) {
+                        console.warn("Skipping partial data chunk");
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Stream error:', err);
+        addMessage('system', '>> CRITICAL ERROR: STREAM DISCONNECTED');
+    }
+}
+
+async function handleEvent(event, isReplay = false) {
+    console.log("OS_EVENT_INBOUND:", event);
+    
+    switch (event.type) {
+        case 'log':
+            addLog(event.content);
+            break;
+        
+        case 'dialog':
+            addMessage('ai', event.content, isReplay);
+            break;
+
+        case 'profile_start':
+            // 🔥 UPDATE DISPLAY WITH USER INFO
+            const userImg = sessionStorage.getItem('userImage');
+            const userName = sessionStorage.getItem('userName') || 'USER';
+            if (userImg) {
+                updateDisplay({
+                    image: userImg,
+                    track: "BEHAVIORAL PROFILE",
+                    artist: userName.toUpperCase()
+                });
+            }
+            
+            // SHOW PROFILE CARD
+            const pCard = document.getElementById('profileCard');
+            const pAvatar = document.getElementById('profileAvatar');
+            const pOutput = document.getElementById('profileOutput');
+            const pInteraction = document.getElementById('profileInteraction');
+            
+            pCard.style.display = 'flex';
+            pAvatar.src = userImg || 'https://placehold.co/80';
+            pOutput.textContent = '';
+            pInteraction.style.display = 'none';
+            
+            // Cleanup any existing queue to prevent overlaps
+            if (currentTokenQueue) currentTokenQueue.stop();
+
+            // RENDER AI QUESTION
+            if (event.question_module && !isReplay) {
+                const qText = document.getElementById('profileQuestionText');
+                const btnA = document.getElementById('profileOptionA');
+                const btnB = document.getElementById('profileOptionB');
+                
+                if (qText) qText.textContent = event.question_module.question;
+                if (btnA) btnA.textContent = event.question_module.options.A;
+                if (btnB) btnB.textContent = event.question_module.options.B;
+            }
+
+            currentTokenQueue = new TokenQueue(pOutput, () => {
+                // Show buttons when done typing the profile roast
+                pInteraction.style.display = 'flex';
+            });
+            break;
+
+        case 'profile_token':
+            if (currentTokenQueue) {
+                currentTokenQueue.add(event.text, isReplay);
+            }
+            break;
+
+        case 'profile_end':
+            lastProfileComplete = true;
+            if (currentTokenQueue) {
+                if (isReplay) {
+                    currentTokenQueue.stop();
+                    currentTokenQueue = null;
+                } else {
+                    // Mark as finished so waitForQueue can resolve
+                    currentTokenQueue.finish();
+                }
+            }
+            break;
+
+        case 'coverflow':
+            updateDisplay(event.song);
+            break;
+
+        case 'emotion':
+            if (event.data && Array.isArray(event.data)) {
+                spectrumText.textContent = event.data.join(', ').toUpperCase();
+            } else {
+                spectrumText.textContent = "NEUTRAL";
+            }
+            confidenceText.textContent = (event.confidence * 100).toFixed(1) + '%';
+            break;
+
+        case 'roast_start':
+            const songData = enrichedSongs[event.index];
+            let songImg = null;
+            
+            // Set waiting state
+            if (event.question_module && !isReplay) {
+                isWaitingForAnswer = true;
+            }
+
+            // Activate roasting mode to hide clutter
+            messageContainer.classList.add('roasting-active');
+
+            if (songData) {
+                songImg = songData.album_image;
+                updateDisplay({
+                    image: songData.album_image,
+                    track: songData.track_name,
+                    artist: songData.artist_name,
+                    emotions: songData.Emotion,
+                    confidence: songData.emotion_analysis?.emotions_detected
+                });
+            }
+            
+            // Show Roastcard and reset
+            const roastCard = document.getElementById('roastCard');
+            const displayBody = document.getElementById('activeRoastDisplay');
+            const displayContent = displayBody.querySelector('.text-content');
+            const qModule = document.getElementById('questionModule');
+            const qText = document.getElementById('questionText');
+            
+            roastCard.style.display = 'flex';
+            displayBody.classList.remove('fade-out');
+            displayContent.textContent = '';
+
+            // Cleanup any existing queue to prevent overlaps
+            if (currentTokenQueue) currentTokenQueue.stop();
+
+            // RENDER QUESTION MODULE
+            if (event.question_module && !isReplay) {
+                qModule.style.display = 'block';
+                qText.textContent = event.question_module.question;
+                qModule.dataset.phrase = event.question_module.phrase;
+                qModule.dataset.songIndex = event.index;
+                
+                // Enable buttons
+                document.getElementById('optionA').disabled = false;
+                document.getElementById('optionB').disabled = false;
+            } else {
+                qModule.style.display = 'none';
+            }
+            
+            currentTokenQueue = new TokenQueue(displayContent, () => {
+                // Optional callback when done typing
+            });
+            break;
+
+        case 'roast_token':
+            if (currentTokenQueue) {
+                currentTokenQueue.add(event.text, isReplay);
+            }
+            break;
+
+        case 'roast_end':
+            lastRoastIndex = event.index;
+            
+            if (currentTokenQueue) {
+                if (isReplay) {
+                    currentTokenQueue.stop();
+                    currentTokenQueue = null;
+                } else {
+                    // Mark as finished so waitForQueue can resolve
+                    currentTokenQueue.finish();
+
+                    // Force a wait for the typewriter to finish
+                    await waitForQueue();
+                    
+                    // 🔥 SYNC: If this song had a question, wait for user to answer before proceeding
+                    if (isWaitingForAnswer) {
+                        console.log("ROAST_END: BLOCKING FOR INTERACTION...");
+                        await new Promise(resolve => {
+                            interactionResolver = resolve;
+                        });
+                        console.log("ROAST_END: INTERACTION COMPLETE, PROCEEDING.");
+                    }
+                    
+                    // READ DELAY: Wait 5 seconds so user can actually READ the roast
+                    await new Promise(r => setTimeout(r, 5000));
+                    
+                    const displayBody = document.getElementById('activeRoastDisplay');
+                    const fullText = displayBody.querySelector('.text-content').textContent;
+                    
+                    // CAPTURE FOR COLLECTIVE LIST
+                    const song = enrichedSongs[event.index];
+                    completedRoasts[event.index] = {
+                        track: song ? song.track_name : 'Unknown',
+                        artist: song ? song.artist_name : 'Unknown',
+                        image: song ? song.album_image : 'https://placehold.co/300',
+                        roast: fullText
+                    };
+
+                    displayBody.classList.add('fade-out');
+                    
+                    // Wait for fade-out animation to complete (1.5s as per CSS)
+                    await new Promise(r => setTimeout(r, 1500));
+                    
+                    currentTokenQueue = null;
+                    interactionResolver = null;
+                }
+            }
+            break;
+
+        case 'final_start':
+            isCompleted = true;
+            messageContainer.classList.remove('roasting-active');
+            
+            const finalRoastCard = document.getElementById('roastCard');
+            if (finalRoastCard) finalRoastCard.style.display = 'none';
+
+            // Start final message
+            const finalMsg = addMessage('profile', '');
+            const finalContent = finalMsg.querySelector('.text-content');
+            currentTokenQueue = new TokenQueue(finalContent);
+            
+            if (event.profile) {
+                spectrumText.textContent = event.profile.spectrum.join(', ').toUpperCase();
+                confidenceText.textContent = (event.profile.confidence * 100).toFixed(1) + '%';
+            }
+            break;
+
+        case 'final_token':
+            if (currentTokenQueue) {
+                currentTokenQueue.add(event.text, isReplay);
+            }
+            break;
+
+        case 'final_end':
+            if (currentTokenQueue) {
+                if (isReplay) {
+                    currentTokenQueue.stop();
+                } else {
+                    currentTokenQueue.finish();
+                    await waitForQueue();
+                }
+                currentTokenQueue = null;
+            }
+
+            // RENDER THE GRID
+            const grid = document.createElement('div');
+            grid.className = 'collective-grid';
+            
+            completedRoasts.forEach(item => {
+                if (!item) return;
+                const gridItem = document.createElement('div');
+                gridItem.className = 'grid-item';
+                gridItem.innerHTML = `
+                    <img src="${item.image}" alt="${item.track}">
+                    <div class="grid-overlay">
+                        <h4>${item.track}</h4>
+                        <p>${item.roast}</p>
+                    </div>
+                `;
+                grid.appendChild(gridItem);
+            });
+
+            messageContainer.appendChild(grid);
+            addMessage('system', '>> ANALYSIS_COMPLETE. HOVER OVER COVERS FOR INDIVIDUAL CRITIQUES.');
+            break;
+    }
+}
+
+function addMessage(type, text, instant = false, icon = null) {
+    const msg = document.createElement('div');
+    msg.className = `message ${type}`;
+    
+    if (icon) {
+        msg.style.setProperty('--msg-icon', `url('${icon}')`);
+    }
+    
+    if (type === 'roast' || type === 'ai' || type === 'profile') {
+        msg.innerHTML = '<span class="text-content"></span><span class="cursor"></span>';
+        const content = msg.querySelector('.text-content');
+        if (text) {
+            const tq = new TokenQueue(content, () => {
+                const cursor = msg.querySelector('.cursor');
+                if (cursor) cursor.remove();
+            });
+            tq.add(text, instant);
+        }
+    } else {
+        msg.textContent = text;
+    }
+    
+    messageContainer.appendChild(msg);
+    scrollToBottom();
+    return msg;
+}
+
+function addLog(text) {
+    const log = document.createElement('div');
+    log.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+    logStream.appendChild(log);
+    const parent = logStream.parentElement;
+    parent.scrollTop = parent.scrollHeight;
+}
+
+function updateDisplay(song) {
+    activeCover.src = song.image || 'https://placehold.co/300';
+    activeTitle.textContent = song.track;
+    activeArtist.textContent = song.artist;
+    
+    if (song.emotions) {
+        spectrumText.textContent = song.emotions.join(', ').toUpperCase();
+    }
+    if (song.confidence) {
+        const probs = Object.values(song.confidence);
+        const maxProb = probs.length > 0 ? Math.max(...probs) : 0;
+        confidenceText.textContent = (maxProb * 100).toFixed(1) + '%';
+    }
+    
+    activeCover.classList.add('glitch');
+    setTimeout(() => activeCover.classList.remove('glitch'), 400);
+}
+
+function typeWriter(element, text, callback, i = 0) {
+    // Deprecated, using TokenQueue instead
+    const tq = new TokenQueue(element, callback);
+    tq.add(text);
+}
+
+function scrollToBottom() {
+    messageContainer.scrollTop = messageContainer.scrollHeight;
+}
+</script>

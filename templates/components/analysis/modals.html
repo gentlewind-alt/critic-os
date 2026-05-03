@@ -1,0 +1,25 @@
+<div id="tuneModal" class="mono">
+    <div id="tuneModalTitle" style="color: #ff9d00; font-size: 14px;">// SYSTEM_PROMPT_OVERRIDE</div>
+    
+    <div id="roastTuneArea">
+        <textarea id="promptOverride" placeholder="Enter custom roast instructions..."></textarea>
+    </div>
+    
+    <div id="profileTuneArea" style="display: none;">
+        <textarea id="profilePromptOverride" placeholder="Enter custom profile instructions..."></textarea>
+    </div>
+
+    <div class="modal-btns">
+        <div class="theme-toggle" onclick="closeTuneModal()">[ CANCEL ]</div>
+        <div class="theme-toggle" onclick="saveTuneModal()" style="color: #ff9d00; border-color: #ff9d00;">[ APPLY_CHANGES ]</div>
+    </div>
+</div>
+
+<div id="bootOverlay">
+    <div class="boot-sequence">
+        <div id="bootLog"></div>
+        <div class="boot-progress">
+            <div class="boot-bar" id="bootBar"></div>
+        </div>
+    </div>
+</div>

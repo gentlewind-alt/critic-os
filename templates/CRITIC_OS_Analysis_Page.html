@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRITIC_OS | SESSION ACTIVE</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;500&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+{% include 'components/analysis/styles.html' %}
+</head>
+<body>
+
+{% include 'components/analysis/background.html' %}
+{% include 'components/analysis/modals.html' %}
+{% include 'components/analysis/persona_overlay.html' %}
+
+<div class="app-container" id="appContainer">
+    {% include 'components/analysis/header.html' %}
+
+    <div class="main-content">
+        {% include 'components/analysis/sidebar.html' %}
+        {% include 'components/analysis/chat_window.html' %}
+    </div>
+
+    {% include 'components/analysis/footer.html' %}
+</div>
+
+{% include 'components/analysis/scripts.html' %}
+</body>
+</html>
