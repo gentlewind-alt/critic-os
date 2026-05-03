@@ -3,10 +3,14 @@ import json
 
 from services.pipeline import run_pipeline_optimized
 from routes.auth import auth_bp
-from config import DevelopmentConfig
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-app.config.from_object(DevelopmentConfig)
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 app.register_blueprint(auth_bp)
 
