@@ -19,12 +19,13 @@ class Config:
     JSON_SORT_KEYS = False
     
     # Spotify API
-    SPOTIFY_CLIENT_ID = "1f9e53ad80154199be682d2b8f8fe97d"
-    SPOTIFY_CLIENT_SECRET = "7d0e15d4af71469492ac4e8d5f6e1e0e"
-    SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8000/callback"
+    SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+    SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+    SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI', 'http://127.0.0.1:8000/callback')
     
     # AI Settings
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
     
     # Model paths
     EMOTION_MODEL_PATH = r"C:\Users\samar\OneDrive\Desktop\prodSt\emotion_model"

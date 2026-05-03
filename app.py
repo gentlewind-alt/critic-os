@@ -3,9 +3,10 @@ import json
 
 from services.pipeline import run_pipeline_optimized
 from routes.auth import auth_bp
+from config import DevelopmentConfig
 
 app = Flask(__name__)
-app.secret_key = "buttfucker_5000"
+app.config.from_object(DevelopmentConfig)
 
 app.register_blueprint(auth_bp)
 
