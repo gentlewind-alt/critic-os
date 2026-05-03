@@ -26,9 +26,12 @@ class Config:
     # AI Settings
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    HUGGINGFACE_TOKEN = os.getenv('HUGGINGFACE_TOKEN')
+    
+    # HF Inference URL
+    HF_INFERENCE_URL = "https://api-inference.huggingface.co/models/samarthruckstar/emotion_label_model"
     
     # Model paths
-    EMOTION_MODEL_PATH = r"C:\Users\samar\OneDrive\Desktop\prodSt\emotion_model"
     MISTRAL_MODEL_PATH = r"C:\Users\samar\OneDrive\Desktop\prodSt\mistral-4bit-local"
 
 

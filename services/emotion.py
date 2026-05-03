@@ -1,19 +1,17 @@
 # app/services/emotion.py
 
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from typing import Dict, List
 import os
 import logging
+import requests
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
 # ==========================
 # CONFIG
 # ==========================
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-MODEL_PATH = os.getenv("EMOTION_MODEL_PATH", "./emotion_model")
+API_URL = os.getenv("HF_INFERENCE_URL", "https://api-inference.huggingface.co/models/samarthruckstar/emotion_label_model")
+HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 EMOTION_LABELS = [
     "admiration", "amusement", "anger", "annoyance", "approval", "caring",
@@ -23,82 +21,72 @@ EMOTION_LABELS = [
     "realization", "relief", "remorse", "sadness", "surprise", "neutral"
 ]
 
-_model = None
-_tokenizer = None
-_num_labels = None
-
 
 # ==========================
-# MODEL LOADER (SINGLETON)
-# ==========================
-def load_emotion_model():
-    global _model, _tokenizer, _num_labels
-
-    if _model is None:
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"Emotion model not found: {MODEL_PATH}")
-
-        logger.info(f"Loading emotion model from: {MODEL_PATH}")
-
-        _tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-        _model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
-
-        _model.to(DEVICE)
-        _model.eval()
-
-        _num_labels = len(EMOTION_LABELS)
-
-        logger.info(f"Emotion model loaded | labels: {_num_labels}")
-
-    return _model, _tokenizer, _num_labels
-
-
-# ==========================
-# CORE PREDICTION
+# CORE PREDICTION (API)
 # ==========================
 def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
-
-    model, tokenizer, num_labels = load_emotion_model()
-
+    """
+    Calls the Hugging Face Inference API to get emotion predictions.
+    """
     if not lyrics or len(lyrics.strip()) < 15:
         return {
             "emotions_detected": {},
             "Emotion": ["neutral"]
         }
 
-    inputs = tokenizer(
-        lyrics,
-        padding="max_length",
-        truncation=True,
-        max_length=256,
-        return_tensors="pt"
-    )
+    if not HF_TOKEN:
+        logger.error("HUGGINGFACE_TOKEN not found in environment variables.")
+        return {"emotions_detected": {}, "Emotion": ["neutral"]}
 
-    inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    payload = {"inputs": lyrics, "parameters": {"return_all_scores": True}}
 
-    with torch.no_grad():
-        logits = model(**inputs).logits
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
+        
+        # Handle model loading state (HF returns 503 while loading)
+        if response.status_code == 503:
+            logger.info("HF Model is loading, retrying in 5s...")
+            import time
+            time.sleep(5)
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=15)
 
-    probs = torch.sigmoid(logits).squeeze().cpu().numpy()
-
-    emotion_dict = {
-        label: float(prob)
-        for label, prob in zip(EMOTION_LABELS[:num_labels], probs)
-    }
-
-    detected = {
-        k: round(v, 4)
-        for k, v in emotion_dict.items()
-        if v >= threshold
-    }
-
-    detected = dict(sorted(detected.items(), key=lambda x: x[1], reverse=True))
-
-    emotion_list = list(detected.keys()) if detected else ["neutral"]
-
+        response.raise_for_status()
+        predictions = response.json()
+        
+        # HF Inference API for classification typically returns [[{"label": "...", "score": ...}, ...]]
+        if isinstance(predictions, list) and len(predictions) > 0:
+            if isinstance(predictions[0], list):
+                scores = predictions[0]
+            else:
+                scores = predictions # Some tasks return direct list
+            
+            emotion_dict = {
+                item['label']: float(item['score'])
+                for item in scores
+            }
+            
+            detected = {
+                k: round(v, 4)
+                for k, v in emotion_dict.items()
+                if v >= threshold
+            }
+            
+            detected = dict(sorted(detected.items(), key=lambda x: x[1], reverse=True))
+            emotion_list = list(detected.keys()) if detected else ["neutral"]
+            
+            return {
+                "emotions_detected": detected,
+                "Emotion": emotion_list
+            }
+            
+    except Exception as e:
+        logger.error(f"HF Inference API Error: {e}")
+        
     return {
-        "emotions_detected": detected,
-        "Emotion": emotion_list
+        "emotions_detected": {},
+        "Emotion": ["neutral"]
     }
 
 
