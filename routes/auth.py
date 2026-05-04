@@ -26,7 +26,7 @@ REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/callback
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
 # Comprehensive scopes for all playlist/library access
-SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-library-read playlist-modify-public playlist-modify-private"
+SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-library-read playlist-modify-public playlist-modify-private user-read-private"
 
 
 # ==========================
@@ -69,11 +69,16 @@ def callback():
 # ==========================
 # AUTH HELPERS
 # ==========================
-def get_sp_client():
+def get_sp_client(timeout=10):
     sp_oauth = create_spotify_oauth()
-    if not sp_oauth.validate_token(sp_oauth.cache_handler.get_cached_token()):
+    try:
+        # Validate token with a shorter timeout
+        token = sp_oauth.cache_handler.get_cached_token()
+        if not sp_oauth.validate_token(token):
+            return None
+    except:
         return None
-    return spotipy.Spotify(oauth_manager=sp_oauth)
+    return spotipy.Spotify(oauth_manager=sp_oauth, requests_timeout=timeout)
 
 @auth_bp.route("/debug-token")
 def debug_token():
@@ -131,50 +136,94 @@ def get_user():
         "image": image_url
     })
 
+import concurrent.futures
+
 @auth_bp.route("/get-collections")
 def get_collections():
-    sp = get_sp_client()
+    # Use a tight timeout for the initial collection list
+    sp = get_sp_client(timeout=10)
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
     try:
+        # Use session to cache user info for speed
+        user_id = session.get('user_id')
+        market = session.get('market')
+        
+        if not user_id or not market:
+            user = sp.current_user()
+            user_id = user.get('id')
+            market = user.get("country")
+            session['user_id'] = user_id
+            session['market'] = market
+        
         liked_total = 0
         try:
             liked_res = sp.current_user_saved_tracks(limit=1)
             liked_total = liked_res.get('total', 0)
         except: pass
 
+        # Reduce limit for speed, but keep it high enough to find user playlists
         playlists_res = sp.current_user_playlists(limit=50)
+        items = playlists_res.get('items', []) if playlists_res else []
+
         playlists = []
         
-        for p in playlists_res.get('items', []):
-            if not p: continue
+        def process_playlist(p):
+            if not p: return None
             
-            image_url = p.get('images')[0].get('url', "") if p.get('images') else ""
+            p_id = p.get('id')
+            p_name = p.get('name')
             
+            # Defensive image parsing
+            image_url = ""
+            if p.get('images') and len(p.get('images')) > 0:
+                img = p.get('images')[0]
+                if isinstance(img, dict) and img.get('url'):
+                    image_url = img.get('url')
+
+            owner_id = p.get('owner', {}).get('id')
+            is_owner = owner_id == user_id
+
             # Initial count from simplified object
-            total_tracks = 0
             tracks_info = p.get('tracks', {})
+            total_tracks = 0
             if isinstance(tracks_info, dict):
-                total_tracks = tracks_info.get('total', 0)
+                # Use .get() carefully to handle None values
+                total_tracks = tracks_info.get('total') or 0
             
-            # SAFE FALLBACK: If 0, try a quick items check but ignore 403/errors silently
+            # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist_items
+            # Ref: https://developer.spotify.com/documentation/web-api/reference/get-playlists-items
             if total_tracks == 0:
                 try:
-                    # We only request 'total' to keep it fast
-                    check = sp.playlist_items(p.get('id'), fields="total", limit=1)
-                    if check and 'total' in check:
-                        total_tracks = check['total']
-                except:
-                    # If 403 or other error, we just stick with 0. 
-                    # This prevents the noisy logs while fixing the bug for valid playlists.
+                    # We specify additional_types='track,episode' to ensure we count EVERYTHING in the playlist.
+                    # We only fetch the 'total' field to keep the payload tiny and fast.
+                    check = sp.playlist_items(
+                        p_id, 
+                        fields="total", 
+                        limit=1, 
+                        additional_types='track,episode'
+                    )
+                    if check and isinstance(check, dict) and 'total' in check:
+                        total_tracks = check.get('total') or 0
+                except Exception as e:
+                    logger.warning(f"Fallback fetch failed for playlist {p_id}: {e}")
                     pass
 
-            playlists.append({
-                "id": p.get('id'),
-                "name": p.get('name'),
+            return {
+                "id": p_id,
+                "name": p_name,
                 "image": image_url,
-                "total": total_tracks
-            })
+                "total": total_tracks,
+                "is_owner": is_owner
+            }
+
+        # Use ThreadPoolExecutor to process playlists in parallel
+        # Increased max_workers to 10 for better speed when multiple fallbacks are needed
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(process_playlist, items))
+        
+        # Filter out None and sort to maintain original order if needed (map preserves order)
+        playlists = [r for r in results if r is not None]
             
         return jsonify({
             "liked_total": liked_total,
@@ -186,8 +235,14 @@ def get_collections():
 
 def clean_track_name(name: str) -> str:
     """Removes junk like (Remastered) or - Live from track names."""
+    # 1. Remove everything in parentheses or brackets (e.g. "(feat. ...)", "[Remix]")
     name = re.sub(r'\s*[\(\[].*?[\)\]]', '', name)
-    name = re.sub(r'\s*-\s*(Remastered|Live|Radio Edit|Deluxe Edition|Single Version).*', '', name, flags=re.I)
+    
+    # 2. Remove common suffixes after a hyphen (Remastered, Live, etc.)
+    # We use a broader regex to catch variations
+    name = re.sub(r'\s*-\s*(Remastered|Live|Radio Edit|Deluxe Edition|Single Version|Mix|Edit|Version|feat\..*|with.*).*', '', name, flags=re.I)
+    
+    # 3. Final trim
     return name.strip()
 
 @auth_bp.route("/fetch-collection-songs", methods=["POST"])
@@ -200,6 +255,7 @@ def fetch_collection_songs():
     col_name = data.get("collection_name")
     
     logger.info(f"FETCHING SONGS: Collection '{col_name}' (ID: {col_id})")
+    logger.info(f"REDIRECT_URI_USED: {REDIRECT_URI}")
 
     try:
         if col_id == "liked":
@@ -208,43 +264,47 @@ def fetch_collection_songs():
             pl = sp.playlist_items(col_id, limit=50)
             
         if not pl:
+            logger.error("Spotify API returned None for the collection.")
             return jsonify({"error": "spotify_error", "message": "Spotify returned no data."}), 500
 
         items = pl.get('items', [])
         logger.info(f"FETCH_DEBUG: Received {len(items)} items from Spotify.")
         
+        if len(items) == 0:
+            logger.warning(f"Collection '{col_name}' is literally empty according to Spotify.")
+            return jsonify({
+                "error": "empty_collection", 
+                "message": f"Spotify says your '{col_name}' collection is empty. Make sure you are logged into the right account!"
+            }), 400
+
         if len(items) > 0:
-            # DEEP DUMP of the first item so we can see the exact structure
-            logger.info(f"RAW_ITEM_DUMP (FIRST): {str(items[0])[:500]}...")
+            # DEEP DUMP of the first item so we can see the exact structure in Vercel logs
+            logger.info(f"RAW_ITEM_DUMP (FIRST): {str(items[0])[:1000]}...")
 
         raw_tracks = []
-        for item in items:
+        for index, item in enumerate(items):
             if not item: continue
             
             # UNIVERSAL PARSER: Check all known nesting patterns
-            # 1. 'track' (Standard Playlists / Liked Songs)
-            # 2. 'item' (New / Documentation / Items Endpoint)
-            # 3. 'episode' (Podcasts in Playlists)
             track_obj = item.get('track') or item.get('item') or item.get('episode')
             
-            # 4. Fallback: Check if the item itself is the track (Search / Albums)
+            # Fallback: Check if the item itself is the track
             if not track_obj or not isinstance(track_obj, dict):
                 track_obj = item
             
-            # Extract metadata
             t_name = track_obj.get('name')
             t_artists = track_obj.get('artists', [])
             
-            # Validate: At minimum, we need a name and an artist list
             if t_name and isinstance(t_artists, list) and len(t_artists) > 0:
                 raw_tracks.append(track_obj)
             else:
-                logger.debug(f"Parser skipped item: {t_name or 'No Name'}")
+                logger.warning(f"Parser skipped item at index {index}: {t_name or 'No Name'}. Type: {track_obj.get('type', 'unknown')}")
 
         if not raw_tracks:
+            logger.error(f"Failed to parse any valid tracks from {len(items)} items.")
             return jsonify({
                 "error": "no_songs_found", 
-                "message": f"Universal parser found {len(items)} items in '{col_name}', but none matched a valid music/audio structure."
+                "message": f"Found {len(items)} items, but none matched the music structure. Check your Vercel logs for RAW_ITEM_DUMP."
             }), 400
 
         random.shuffle(raw_tracks)

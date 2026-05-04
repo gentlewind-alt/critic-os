@@ -77,5 +77,24 @@ def stream_answer():
 
     return Response(event_stream(), mimetype="text/event-stream")
 
+@app.route("/stream-profile-answer", methods=["POST"])
+def stream_profile_answer():
+    songs = request.json.get("songs", [])
+    persona = request.json.get("persona", "normal")
+    interaction_state = request.json.get("state", "")
+    profile_custom_prompt = request.json.get("profile_custom_prompt")
+
+    from services.roast import generate_profile_roast_stream
+    
+    def event_stream():
+        try:
+            for token in generate_profile_roast_stream(songs, persona, profile_custom_prompt, interaction_state):
+                yield f"data: {json.dumps({'type': 'profile_token', 'text': token})}\n\n"
+            yield f"data: {json.dumps({'type': 'profile_end'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type':'error','msg':str(e)})}\n\n"
+
+    return Response(event_stream(), mimetype="text/event-stream")
+
 if __name__ == "__main__":
     app.run(debug=True)

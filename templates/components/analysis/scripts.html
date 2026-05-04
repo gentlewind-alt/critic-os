@@ -59,6 +59,7 @@ class TokenQueue {
         this.isRunning = false;
         this.isFinished = false; 
         this.speed = 40; 
+        this.timeoutId = null;
     }
 
     add(text, instant = false) {
@@ -73,14 +74,17 @@ class TokenQueue {
     }
 
     process() {
+        if (this.timeoutId) clearTimeout(this.timeoutId);
+        
         if (this.queue.length > 0) {
             this.isRunning = true;
             this.element.textContent += this.queue.charAt(0);
             this.queue = this.queue.substring(1);
             scrollToBottom();
-            setTimeout(() => this.process(), this.speed);
+            this.timeoutId = setTimeout(() => this.process(), this.speed);
         } else {
             this.isRunning = false;
+            this.timeoutId = null;
             if (this.isFinished && this.callback) this.callback();
         }
     }
@@ -91,12 +95,43 @@ class TokenQueue {
     }
 
     stop() {
+        // Cancel pending loop
+        if (this.timeoutId) clearTimeout(this.timeoutId);
+        this.timeoutId = null;
+        
+        // Dump remaining queue instantly
         this.element.textContent += this.queue;
         this.queue = "";
         this.isRunning = false;
         this.isFinished = true;
         if (this.callback) this.callback();
     }
+    
+    cancel() {
+        // Hard stop without dumping queue
+        if (this.timeoutId) clearTimeout(this.timeoutId);
+        this.timeoutId = null;
+        this.queue = "";
+        this.isRunning = false;
+    }
+}
+
+/**
+ * Utility to detect potential "gibberish" (interleaved strings)
+ * by checking for unrealistic word structures or high symbol density.
+ */
+function isPotentialGibberish(text) {
+    if (!text || text.length < 20) return false;
+    
+    // Check for high density of short word fragments or mixed casing
+    const words = text.split(/\s+/);
+    if (words.length < 3) return false;
+    
+    // An interleaved string often has words with non-standard characters in middle
+    const weirdWords = words.filter(w => /[a-z][A-Z]/.test(w) || /['][a-zA-Z]/.test(w.substring(1))).length;
+    const ratio = weirdWords / words.length;
+    
+    return ratio > 0.3; // If more than 30% of words look "interleaved"
 }
 
 // BOOT SEQUENCE SIMULATION
@@ -325,35 +360,68 @@ function waitForQueue() {
     });
 }
 
-function handleProfileResponse(choice) {
+async function handleProfileResponse(choice) {
     const pInteraction = document.getElementById('profileInteraction');
     const pOutput = document.getElementById('profileOutput');
+    const qText = document.getElementById('profileQuestionText').textContent;
+    const optionText = choice === 'A' ? document.getElementById('profileOptionA').textContent : document.getElementById('profileOptionB').textContent;
+    
     pInteraction.style.display = 'none';
+    pOutput.textContent = '>> RE-GROUNDING AI_CORE_LOGIC...';
     
-    let nextText = "";
-    if (choice === 'A') {
-        nextText = " ohhh okay, who am i to judge (i will regardless)... let's see how much deeper this hole goes.";
-    } else {
-        nextText = " exactly. who am i to judge (i will regardless)... buckle up, this is going to be brutal.";
-    }
+    const state = `was asked "${qText}" and answered: "${optionText}"`;
     
-    // Use TokenQueue to type the response
-    const tq = new TokenQueue(pOutput, () => {
-        // After typing, wait a bit then fade out card
-        setTimeout(() => {
-            const pCard = document.getElementById('profileCard');
-            pCard.style.transition = 'opacity 1s ease';
-            pCard.style.opacity = '0';
+    try {
+        const response = await fetch('/stream-profile-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                songs: enrichedSongs,
+                persona: selectedPersona,
+                state: state,
+                profile_custom_prompt: sessionStorage.getItem('os_profile_custom_prompt')
+            })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        pOutput.textContent = ''; 
+        currentTokenQueue = new TokenQueue(pOutput, () => {
+            // After typing, wait a bit then fade out card
             setTimeout(() => {
-                pCard.style.display = 'none';
-                pCard.style.opacity = '1'; // Reset for potential re-runs
-                // Signal streaming to continue
-                isWaitingForProfileResponse = false;
-            }, 1000);
-        }, 2000);
-    });
-    tq.add(nextText);
-    tq.finish();
+                const pCard = document.getElementById('profileCard');
+                pCard.style.transition = 'opacity 1s ease';
+                pCard.style.opacity = '0';
+                setTimeout(() => {
+                    pCard.style.display = 'none';
+                    pCard.style.opacity = '1'; 
+                    isWaitingForProfileResponse = false;
+                }, 1000);
+            }, 3000);
+        });
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'profile_token') {
+                        currentTokenQueue.add(data.text);
+                    }
+                }
+            }
+        }
+        currentTokenQueue.finish();
+        
+    } catch (e) {
+        console.error("Profile answer submission failed:", e);
+        pOutput.textContent = "[SYSTEM ERROR: FAILED TO RE-GROUND PROFILE]";
+        isWaitingForProfileResponse = false;
+    }
 }
 
 let isWaitingForProfileResponse = false;

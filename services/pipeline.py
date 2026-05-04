@@ -6,7 +6,7 @@ from typing import List, Dict
 from services.processing import process_songs_batch
 from services.emotion import process_song_emotion
 from services.roast import generate_roast_stream, generate_profile_roast_stream
-from services.interaction import build_question_data
+# from services.interaction import build_question_data
 
 
 # ==========================
@@ -133,7 +133,7 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
     yield _log("Executing behavioral critique song-by-song...")
 
     from services.interaction import generate_ai_question, map_answer_to_state
-    from services.roast import generate_roast_stream, generate_short_impression_stream
+    from services.roast import generate_roast_stream
 
     for i, song in enumerate(enriched_songs):
         # 1. Update Display (Cover + Emotions)
@@ -159,7 +159,10 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
         
         yield _log(f"Analyzing {song.get('track_name')}...")
 
-        # 2. Roast this song (TIERED + INTERACTIVE)
+        # 2. Roast this song (INTERACTIVE)
+        # Weave previous interactions into the current roast
+        current_context = " | ".join(session_history[-2:]) if session_history else None
+
         if i < 5:
             # FULL ROAST WITH AI QUESTION
             q_data = generate_ai_question(song, persona, session_history)
@@ -172,20 +175,17 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
                 "question_module": q_data
             }
             
-            # Weave previous interactions into the current roast
-            current_context = " | ".join(session_history[-2:]) if session_history else None
             generator = generate_roast_stream(song, persona, custom_prompt, current_context)
-            
             session_history.append(f"Discussed {song.get('track_name')}: asked '{q_data.get('question')}'")
         else:
-            # SHORT IMPRESSION
+            # ROAST WITHOUT QUESTION
             yield {
                 "type": "roast_start",
                 "index": i,
                 "track": song.get("track_name"),
                 "artist": song.get("artist_name")
             }
-            generator = generate_short_impression_stream(song, persona)
+            generator = generate_roast_stream(song, persona, custom_prompt, current_context)
 
         song_roast_chunks = []
         try:

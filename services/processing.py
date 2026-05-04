@@ -21,7 +21,14 @@ class LyricFetcher:
         album_name: Optional[str] = None,
         duration: Optional[int] = None
     ) -> Optional[Dict]:
+        """
+        Attempts to get lyrics using multiple strategies:
+        1. Exact match (get_lyrics)
+        2. Fuzzy search (search_lyrics)
+        """
+        lyrics_data = None
 
+        # STRATEGY 1: Exact Match
         try:
             lyrics_data = self.api.get_lyrics(
                 track_name=track_name,
@@ -29,24 +36,35 @@ class LyricFetcher:
                 album_name=album_name,
                 duration=duration
             )
-
-            if not lyrics_data:
-                logger.info(f"     ℹ️  Retrying without album name for: {track_name} — {artist_name}")
-                lyrics_data = self.api.get_lyrics(
-                    track_name=track_name,
-                    artist_name=artist_name
-                )
-
-            if lyrics_data:
-                return {
-                    "plain_lyrics": lyrics_data.plain_lyrics,
-                    "synced_lyrics": lyrics_data.synced_lyrics
-                }
-            return None
-
         except Exception as e:
-            logger.warning(f"Lyrics fetch failed: {track_name} - {artist_name} | {e}")
-            return None
+            # LrcLibAPI often raises 404 if exact match fails
+            logger.info(f"     ℹ️ Exact match failed (Strategy 1): {e}")
+
+        # STRATEGY 2: Fuzzy Search
+        if not lyrics_data:
+            try:
+                logger.info(f"     🔍 Attempting search (Strategy 2): {track_name} — {artist_name}")
+                # We use a combined query string for the best fuzzy results
+                query = f"{track_name} {artist_name}"
+                search_results = self.api.search_lyrics(query=query)
+                
+                if search_results and len(search_results) > 0:
+                    # Pick the first result that has plain lyrics
+                    for res in search_results:
+                        if res.plain_lyrics:
+                            lyrics_data = res
+                            logger.info(f"     ✅ Found match via search: {res.track_name} by {res.artist_name}")
+                            break
+            except Exception as e:
+                logger.warning(f"     ❌ Search failed (Strategy 2): {e}")
+
+        if lyrics_data:
+            return {
+                "plain_lyrics": lyrics_data.plain_lyrics,
+                "synced_lyrics": getattr(lyrics_data, 'synced_lyrics', None)
+            }
+        
+        return None
 
 
 # ==========================
@@ -67,38 +85,25 @@ def process_song(song: Dict, fetcher: LyricFetcher) -> Dict:
         return {
             **song,
             "plain_lyrics": None,
-            # "synced_lyrics": None,
             "lyrics_found": False
         }
 
-    # First attempt with album_name
+    # Use the improved multi-strategy fetcher
     lyrics_data = fetcher.get_lyrics(
         track_name=track,
         artist_name=artist,
         album_name=album
     )
 
-    # If not found with album_name, retry without it
-    if not lyrics_data:
-        logger.info(f"     ℹ️  Retrying without album name for: {track} — {artist}")
-        lyrics_data = fetcher.get_lyrics(
-            track_name=track,
-            artist_name=artist
-        )
-
-    # Normalize result and decide whether lyrics were found
     plain = None
-    synced = None
     found = False
     if lyrics_data:
-        plain = lyrics_data.get("plain_lyrics") if isinstance(lyrics_data, dict) else None
-        # synced = lyrics_data.get("synced_lyrics") if isinstance(lyrics_data, dict) else None
-        found = bool(plain or synced)
+        plain = lyrics_data.get("plain_lyrics")
+        found = bool(plain)
 
     return {
         **song,
         "plain_lyrics": plain,
-        # "synced_lyrics": synced,
         "lyrics_found": found
     }
 

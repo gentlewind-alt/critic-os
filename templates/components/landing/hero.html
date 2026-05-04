@@ -19,12 +19,18 @@
     <div id="collectionOverlay" class="collection-overlay" style="display: none;">
         <div class="collection-window">
             <div class="collection-header">
-                <span class="mono">// SELECT_DATA_COLLECTION</span>
+                <span class="mono" id="collectionTitle">// SELECT_DATA_COLLECTION</span>
                 <button class="close-btn" onclick="closeCollectionSelector()">[ X ]</button>
             </div>
+            
             <div id="collectionList" class="collection-list mono">
                 <!-- Populated via JS -->
                 <div class="loading-text">FETCHING COLLECTIONS...</div>
+            </div>
+
+            <!-- New Status Log Area -->
+            <div id="processLog" class="mono" style="display:none; padding: 20px; border-top: 1px solid var(--border-color); font-size: 11px; color: var(--accent-color); background: rgba(0,0,0,0.5); max-height: 150px; overflow-y: auto;">
+                <!-- Logs will appear here -->
             </div>
         </div>
     </div>
