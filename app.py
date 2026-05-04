@@ -1,4 +1,6 @@
 from flask import Flask, Response, render_template, request
+from flask_session import Session
+import redis
 import json
 
 from services.pipeline import run_pipeline_optimized
@@ -11,6 +13,20 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# ==========================
+# REDIS SESSION CONFIG
+# ==========================
+app.config['SESSION_TYPE'] = 'redis'
+app.config['SESSION_PERMANENT'] = True
+app.config['SESSION_USE_SIGNER'] = True
+
+# Use the Redis URL provided by the user (fallback to local if not set)
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+
+# Initialize Session
+Session(app)
 
 app.register_blueprint(auth_bp)
 
