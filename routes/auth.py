@@ -186,11 +186,19 @@ def get_collections():
     sp = get_sp_client(timeout=10)
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
+    # Verify Redis configuration for Vercel
+    if not os.getenv('REDIS_URL') and os.getenv('VERCEL'):
+        logger.error("REDIS_URL is missing in Vercel environment! Sessions will be unstable.")
+
     try:
-        # We extract the token directly from the client we just created
-        # In get_sp_client, we already handled the refresh logic.
-        access_token = sp._auth
-        sp_worker = spotipy.Spotify(auth=access_token, requests_timeout=5)
+        # Correctly extract the access token from the authenticated client
+        # .auth is the standard attribute for the token in Spotipy
+        access_token = getattr(sp, 'auth', None)
+        if not access_token:
+            logger.error("Failed to extract access token for background workers.")
+            return jsonify({"error": "token_extraction_failed"}), 500
+
+        sp_worker = spotipy.Spotify(auth=access_token, requests_timeout=7)
         
         # Use session to cache user info for speed
         user_id = session.get('user_id')
