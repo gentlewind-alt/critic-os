@@ -110,7 +110,7 @@ def get_sp_client(timeout=10):
     except:
         return None
         
-    return spotipy.Spotify(auth=token['access_token'], requests_timeout=timeout)
+    return spotipy.Spotify(oauth_manager=sp_oauth, requests_timeout=timeout)
 
 @auth_bp.route("/debug-token")
 def debug_token():
