@@ -33,12 +33,14 @@ SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-li
 # SPOTIFY AUTH SETUP
 # ==========================
 def create_spotify_oauth():
-    # Switched back to local file-based cache (.cache) for reliability
+    # Use absolute path for the cache file to avoid write errors in different environments
+    cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".cache")
     return SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
+        cache_path=cache_path,
         show_dialog=True
     )
 
