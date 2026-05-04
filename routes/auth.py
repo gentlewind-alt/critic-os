@@ -238,21 +238,23 @@ def get_collections():
                 total_tracks = tracks_info.get('total') or 0
             
             # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist_items
-            # Ref: https://developer.spotify.com/documentation/web-api/reference/get-playlists-items
             if total_tracks == 0:
-                try:
-                    # We use sp_worker here as it doesn't require a Flask request context.
-                    check = sp_worker.playlist_items(
-                        p_id, 
-                        fields="total", 
-                        limit=1, 
-                        additional_types='track,episode'
-                    )
-                    if check and isinstance(check, dict) and 'total' in check:
-                        total_tracks = check.get('total') or 0
-                except Exception as e:
-                    # Silent fail on Vercel to avoid flooding logs, but keep track of it
-                    pass
+                # RETRY LOGIC for Serverless Resilience
+                for attempt in range(2):
+                    try:
+                        check = sp_worker.playlist_items(
+                            p_id, 
+                            fields="total", 
+                            limit=1, 
+                            additional_types='track,episode'
+                        )
+                        if check and isinstance(check, dict) and 'total' in check:
+                            total_tracks = check.get('total') or 0
+                            break # Success!
+                    except Exception as e:
+                        if attempt == 1:
+                            logger.error(f"VERCEL_FETCH_ERROR for {p_name} ({p_id}): {e}")
+                        time.sleep(0.5) # Tiny backoff
 
             return {
                 "id": p_id,
