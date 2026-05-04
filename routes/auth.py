@@ -30,20 +30,40 @@ SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-li
 
 
 # ==========================
+# CUSTOM CACHE HANDLER
+# ==========================
+from spotipy.cache_handler import CacheHandler
+
+class MemoryCacheHandler(CacheHandler):
+    """
+    A cleaner memory-based cache handler that avoids disk I/O.
+    We manually sync this with the Flask session in the main thread.
+    """
+    def __init__(self, token_info=None):
+        self.token_info = token_info
+
+    def get_cached_token(self):
+        return self.token_info
+
+    def save_token_to_cache(self, token_info):
+        self.token_info = token_info
+
+# ==========================
 # SPOTIFY AUTH SETUP
 # ==========================
 def create_spotify_oauth():
-    # Use absolute path for the cache file to avoid write errors in different environments
-    cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".cache")
+    # Retrieve token from session to initialize the memory handler
+    token_info = session.get('spotify_token')
+    cache_handler = MemoryCacheHandler(token_info)
+    
     return SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
         scope=SCOPE,
-        cache_path=cache_path,
+        cache_handler=cache_handler,
         show_dialog=True
     )
-
 
 # ==========================
 # LOGIN ROUTE
@@ -64,6 +84,9 @@ def callback():
     session.clear() 
     code = request.args.get("code")
     token_info = sp_oauth.get_access_token(code)
+    
+    # Persist the token in the session manually
+    session['spotify_token'] = token_info
     return redirect("/")
 
 
@@ -73,13 +96,21 @@ def callback():
 def get_sp_client(timeout=10):
     sp_oauth = create_spotify_oauth()
     try:
-        # Validate token with a shorter timeout
         token = sp_oauth.cache_handler.get_cached_token()
+        if not token:
+            return None
+            
+        # If token is expired, refresh it and update session
+        if sp_oauth.is_token_expired(token):
+            token = sp_oauth.refresh_access_token(token['refresh_token'])
+            session['spotify_token'] = token
+            
         if not sp_oauth.validate_token(token):
             return None
     except:
         return None
-    return spotipy.Spotify(oauth_manager=sp_oauth, requests_timeout=timeout)
+        
+    return spotipy.Spotify(auth=token['access_token'], requests_timeout=timeout)
 
 @auth_bp.route("/debug-token")
 def debug_token():
