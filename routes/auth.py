@@ -191,11 +191,13 @@ def get_collections():
         logger.error("REDIS_URL is missing in Vercel environment! Sessions will be unstable.")
 
     try:
-        # Correctly extract the access token from the authenticated client
-        # .auth is the standard attribute for the token in Spotipy
-        access_token = getattr(sp, 'auth', None)
+        # Get a fresh token directly from the OAuth manager to pass to workers
+        sp_oauth = create_spotify_oauth()
+        token_info = sp_oauth.cache_handler.get_cached_token()
+        access_token = token_info.get('access_token') if token_info else None
+        
         if not access_token:
-            logger.error("Failed to extract access token for background workers.")
+            logger.error("Failed to extract access token for background workers from session.")
             return jsonify({"error": "token_extraction_failed"}), 500
 
         sp_worker = spotipy.Spotify(auth=access_token, requests_timeout=7)
