@@ -59,6 +59,7 @@ class TokenQueue {
         this.isRunning = false;
         this.isFinished = false; 
         this.speed = 40; 
+        this.timeoutId = null;
     }
 
     add(text, instant = false) {
@@ -73,14 +74,17 @@ class TokenQueue {
     }
 
     process() {
+        if (this.timeoutId) clearTimeout(this.timeoutId);
+        
         if (this.queue.length > 0) {
             this.isRunning = true;
             this.element.textContent += this.queue.charAt(0);
             this.queue = this.queue.substring(1);
             scrollToBottom();
-            setTimeout(() => this.process(), this.speed);
+            this.timeoutId = setTimeout(() => this.process(), this.speed);
         } else {
             this.isRunning = false;
+            this.timeoutId = null;
             if (this.isFinished && this.callback) this.callback();
         }
     }
@@ -91,12 +95,43 @@ class TokenQueue {
     }
 
     stop() {
+        // Cancel pending loop
+        if (this.timeoutId) clearTimeout(this.timeoutId);
+        this.timeoutId = null;
+        
+        // Dump remaining queue instantly
         this.element.textContent += this.queue;
         this.queue = "";
         this.isRunning = false;
         this.isFinished = true;
         if (this.callback) this.callback();
     }
+    
+    cancel() {
+        // Hard stop without dumping queue
+        if (this.timeoutId) clearTimeout(this.timeoutId);
+        this.timeoutId = null;
+        this.queue = "";
+        this.isRunning = false;
+    }
+}
+
+/**
+ * Utility to detect potential "gibberish" (interleaved strings)
+ * by checking for unrealistic word structures or high symbol density.
+ */
+function isPotentialGibberish(text) {
+    if (!text || text.length < 20) return false;
+    
+    // Check for high density of short word fragments or mixed casing
+    const words = text.split(/\s+/);
+    if (words.length < 3) return false;
+    
+    // An interleaved string often has words with non-standard characters in middle
+    const weirdWords = words.filter(w => /[a-z][A-Z]/.test(w) || /['][a-zA-Z]/.test(w.substring(1))).length;
+    const ratio = weirdWords / words.length;
+    
+    return ratio > 0.3; // If more than 30% of words look "interleaved"
 }
 
 // BOOT SEQUENCE SIMULATION
