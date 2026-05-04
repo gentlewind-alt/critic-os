@@ -200,6 +200,7 @@ def fetch_collection_songs():
     col_name = data.get("collection_name")
     
     logger.info(f"FETCHING SONGS: Collection '{col_name}' (ID: {col_id})")
+    logger.info(f"REDIRECT_URI_USED: {REDIRECT_URI}")
 
     try:
         if col_id == "liked":
@@ -208,43 +209,47 @@ def fetch_collection_songs():
             pl = sp.playlist_items(col_id, limit=50)
             
         if not pl:
+            logger.error("Spotify API returned None for the collection.")
             return jsonify({"error": "spotify_error", "message": "Spotify returned no data."}), 500
 
         items = pl.get('items', [])
         logger.info(f"FETCH_DEBUG: Received {len(items)} items from Spotify.")
         
+        if len(items) == 0:
+            logger.warning(f"Collection '{col_name}' is literally empty according to Spotify.")
+            return jsonify({
+                "error": "empty_collection", 
+                "message": f"Spotify says your '{col_name}' collection is empty. Make sure you are logged into the right account!"
+            }), 400
+
         if len(items) > 0:
-            # DEEP DUMP of the first item so we can see the exact structure
-            logger.info(f"RAW_ITEM_DUMP (FIRST): {str(items[0])[:500]}...")
+            # DEEP DUMP of the first item so we can see the exact structure in Vercel logs
+            logger.info(f"RAW_ITEM_DUMP (FIRST): {str(items[0])[:1000]}...")
 
         raw_tracks = []
-        for item in items:
+        for index, item in enumerate(items):
             if not item: continue
             
             # UNIVERSAL PARSER: Check all known nesting patterns
-            # 1. 'track' (Standard Playlists / Liked Songs)
-            # 2. 'item' (New / Documentation / Items Endpoint)
-            # 3. 'episode' (Podcasts in Playlists)
             track_obj = item.get('track') or item.get('item') or item.get('episode')
             
-            # 4. Fallback: Check if the item itself is the track (Search / Albums)
+            # Fallback: Check if the item itself is the track
             if not track_obj or not isinstance(track_obj, dict):
                 track_obj = item
             
-            # Extract metadata
             t_name = track_obj.get('name')
             t_artists = track_obj.get('artists', [])
             
-            # Validate: At minimum, we need a name and an artist list
             if t_name and isinstance(t_artists, list) and len(t_artists) > 0:
                 raw_tracks.append(track_obj)
             else:
-                logger.debug(f"Parser skipped item: {t_name or 'No Name'}")
+                logger.warning(f"Parser skipped item at index {index}: {t_name or 'No Name'}. Type: {track_obj.get('type', 'unknown')}")
 
         if not raw_tracks:
+            logger.error(f"Failed to parse any valid tracks from {len(items)} items.")
             return jsonify({
                 "error": "no_songs_found", 
-                "message": f"Universal parser found {len(items)} items in '{col_name}', but none matched a valid music/audio structure."
+                "message": f"Found {len(items)} items, but none matched the music structure. Check your Vercel logs for RAW_ITEM_DUMP."
             }), 400
 
         random.shuffle(raw_tracks)
