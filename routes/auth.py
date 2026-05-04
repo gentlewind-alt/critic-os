@@ -169,13 +169,12 @@ def get_collections():
                     # This prevents the noisy logs while fixing the bug for valid playlists.
                     pass
 
-            if total_tracks > 0:
-                playlists.append({
-                    "id": p.get('id'),
-                    "name": p.get('name'),
-                    "image": image_url,
-                    "total": total_tracks
-                })
+            playlists.append({
+                "id": p.get('id'),
+                "name": p.get('name'),
+                "image": image_url,
+                "total": total_tracks
+            })
             
         return jsonify({
             "liked_total": liked_total,
