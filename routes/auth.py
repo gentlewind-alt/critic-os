@@ -228,8 +228,14 @@ def get_collections():
 
 def clean_track_name(name: str) -> str:
     """Removes junk like (Remastered) or - Live from track names."""
+    # 1. Remove everything in parentheses or brackets (e.g. "(feat. ...)", "[Remix]")
     name = re.sub(r'\s*[\(\[].*?[\)\]]', '', name)
-    name = re.sub(r'\s*-\s*(Remastered|Live|Radio Edit|Deluxe Edition|Single Version).*', '', name, flags=re.I)
+    
+    # 2. Remove common suffixes after a hyphen (Remastered, Live, etc.)
+    # We use a broader regex to catch variations
+    name = re.sub(r'\s*-\s*(Remastered|Live|Radio Edit|Deluxe Edition|Single Version|Mix|Edit|Version|feat\..*|with.*).*', '', name, flags=re.I)
+    
+    # 3. Final trim
     return name.strip()
 
 @auth_bp.route("/fetch-collection-songs", methods=["POST"])

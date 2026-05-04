@@ -36,7 +36,7 @@ def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
         }
 
     if not HF_TOKEN:
-        logger.error("HUGGINGFACE_TOKEN not found in environment variables.")
+        logger.warning("HUGGINGFACE_TOKEN not found in environment variables. Emotion analysis will default to 'neutral'.")
         return {"emotions_detected": {}, "Emotion": ["neutral"]}
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
