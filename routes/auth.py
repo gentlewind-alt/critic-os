@@ -13,6 +13,7 @@ import requests
 import os
 import logging
 import random
+import time
 
 auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
@@ -246,8 +247,9 @@ def get_collections():
                             p_id, 
                             fields="total", 
                             limit=1, 
-                            additional_types='track,episode'
+                            additional_types=['track', 'episode']
                         )
+
                         if check and isinstance(check, dict) and 'total' in check:
                             total_tracks = check.get('total') or 0
                             break # Success!
