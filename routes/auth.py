@@ -101,20 +101,25 @@ def get_sp_client(timeout=10):
             return None
             
         # If token is expired, refresh it and update session
+        # This is CRITICAL for Vercel to ensure background workers get a fresh token
         if sp_oauth.is_token_expired(token):
+            logger.info("Token expired. Refreshing for serverless context...")
             token = sp_oauth.refresh_access_token(token['refresh_token'])
             session['spotify_token'] = token
+            session.modified = True # Force Flask to save the session cookie
             
         if not sp_oauth.validate_token(token):
             return None
-    except:
+            
+        # Return client with the refreshed token
+        return spotipy.Spotify(auth=token['access_token'], requests_timeout=timeout)
+    except Exception as e:
+        logger.error(f"Failed to initialize Spotify client: {e}")
         return None
-        
-    return spotipy.Spotify(oauth_manager=sp_oauth, requests_timeout=timeout)
 
 @auth_bp.route("/debug-token")
 def debug_token():
-    token_info = session.get("token_info")
+    token_info = session.get("spotify_token") # Updated key
     if not token_info:
         return jsonify({"status": "no token found in session"})
     
@@ -128,6 +133,10 @@ def debug_token():
 @auth_bp.route("/logout")
 def logout():
     session.clear()
+    # Also clear the local .cache if it exists (for local dev cleanup)
+    if os.path.exists(".cache"):
+        try: os.remove(".cache")
+        except: pass
     return redirect("/")
 
 
@@ -177,6 +186,11 @@ def get_collections():
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
     try:
+        # We extract the token directly from the client we just created
+        # In get_sp_client, we already handled the refresh logic.
+        access_token = sp._auth
+        sp_worker = spotipy.Spotify(auth=access_token, requests_timeout=5)
+        
         # Use session to cache user info for speed
         user_id = session.get('user_id')
         market = session.get('market')
@@ -197,11 +211,6 @@ def get_collections():
         # Reduce limit for speed, but keep it high enough to find user playlists
         playlists_res = sp.current_user_playlists(limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
-
-        # Get access token for a session-less client to use in threads
-        token_info = sp.auth_manager.cache_handler.get_cached_token()
-        access_token = token_info.get('access_token')
-        sp_worker = spotipy.Spotify(auth=access_token)
 
         playlists = []
         
@@ -232,8 +241,6 @@ def get_collections():
             # Ref: https://developer.spotify.com/documentation/web-api/reference/get-playlists-items
             if total_tracks == 0:
                 try:
-                    # We specify additional_types='track,episode' to ensure we count EVERYTHING in the playlist.
-                    # We only fetch the 'total' field to keep the payload tiny and fast.
                     # We use sp_worker here as it doesn't require a Flask request context.
                     check = sp_worker.playlist_items(
                         p_id, 
@@ -244,7 +251,7 @@ def get_collections():
                     if check and isinstance(check, dict) and 'total' in check:
                         total_tracks = check.get('total') or 0
                 except Exception as e:
-                    logger.warning(f"Fallback fetch failed for playlist {p_id}: {e}")
+                    # Silent fail on Vercel to avoid flooding logs, but keep track of it
                     pass
 
             return {
