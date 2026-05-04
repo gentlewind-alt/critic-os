@@ -57,6 +57,23 @@ checkAuth();
 let isRunning = false;
 const collectionOverlay = document.getElementById("collectionOverlay");
 const collectionList = document.getElementById("collectionList");
+const processLog = document.getElementById("processLog");
+const collectionTitle = document.getElementById("collectionTitle");
+
+function addLog(msg, type = 'info') {
+    if (!processLog) return;
+    processLog.style.display = 'block';
+    const log = document.createElement('div');
+    log.style.marginBottom = '4px';
+    log.style.opacity = '0.8';
+    if (type === 'error') log.style.color = '#ff4136';
+    if (type === 'success') log.style.color = '#00ff41';
+    
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    log.textContent = `[${time}] > ${msg}`;
+    processLog.appendChild(log);
+    processLog.scrollTop = processLog.scrollHeight;
+}
 
 async function startAnalysis() {
     if (isRunning) return;
@@ -66,17 +83,28 @@ async function startAnalysis() {
 async function openCollectionSelector() {
     if (!collectionOverlay || !collectionList) return;
     collectionOverlay.style.display = 'flex';
+    collectionList.style.display = 'block';
     collectionList.innerHTML = '<div class="loading-text">FETCHING COLLECTIONS...</div>';
+    if (processLog) {
+        processLog.innerHTML = '';
+        processLog.style.display = 'none';
+    }
+    if (collectionTitle) collectionTitle.textContent = '// SELECT_DATA_COLLECTION';
+    
+    addLog("Initializing Spotify connection...");
     
     try {
+        addLog("Requesting user collections from API...");
         const res = await fetch("/get-collections");
         if (res.status === 401) {
+            addLog("Auth session expired. Redirecting to login...", "error");
             window.location.href = "/login";
             return;
         }
         
         const data = await res.json();
         if (res.status === 403 && data.error === 'insufficient_scope') {
+            addLog("Scope mismatch detected. Re-authentication required.", "error");
             alert("New permissions are required. Logging out...");
             window.location.href = "/logout";
             return;
@@ -84,6 +112,7 @@ async function openCollectionSelector() {
         
         if (data.error) throw new Error(data.error);
         
+        addLog(`Successfully retrieved ${data.playlists.length} collections.`, "success");
         collectionList.innerHTML = '';
         
         // 1. Liked Songs
@@ -115,6 +144,7 @@ async function openCollectionSelector() {
         });
         
     } catch (e) {
+        addLog(`FETCH_FAILED: ${e.message}`, "error");
         collectionList.innerHTML = `<div class="loading-text" style="color:red">ERROR: ${e.message}</div>`;
     }
 }
@@ -127,7 +157,12 @@ async function selectCollection(id, name) {
     if (isRunning) return;
     isRunning = true;
     
-    closeCollectionSelector();
+    if (collectionTitle) collectionTitle.textContent = '// PROCESSING_COLLECTION';
+    collectionList.style.display = 'none';
+    processLog.style.maxHeight = '300px';
+    
+    addLog(`Target locked: ${name}`);
+    
     if (btn) {
         btn.disabled = true;
         btn.textContent = "[ INITIATING... ]";
@@ -135,6 +170,7 @@ async function selectCollection(id, name) {
 
     try {
         // 1️⃣ FETCH SONGS FROM COLLECTION
+        addLog("Scanning collection for viable metadata...");
         const res = await fetch("/fetch-collection-songs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -144,6 +180,7 @@ async function selectCollection(id, name) {
         const data = await res.json();
         
         if (res.status === 401) {
+            addLog("Session invalid. Re-auth required.", "error");
             window.location.href = "/login";
             return;
         }
@@ -152,9 +189,11 @@ async function selectCollection(id, name) {
             throw new Error(data.message || "No tracks found in this collection.");
         }
 
+        addLog(`Found ${data.data.length} tracks. Initializing Last.fm sarcasm mapping...`);
         if (btn) btn.textContent = "[ PROCESSING LYRICS... ]";
 
         // 2️⃣ FETCH LYRICS + EMOTION
+        addLog("Contacting LRC_LIB for lyric retrieval...");
         const lyricsRes = await fetch("/fetch-lyrics", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -167,23 +206,34 @@ async function selectCollection(id, name) {
         }
 
         const enrichedData = await lyricsRes.json();
+        addLog(`Lyrics found for ${enrichedData.songs_with_lyrics}/${enrichedData.total_songs} tracks.`);
+        addLog("Running cognitive emotion mapping via HuggingFace AI...");
         
         if (!enrichedData.data || enrichedData.data.length === 0) {
             throw new Error("Lyric enrichment returned no data.");
         }
         
         // Store for analysis page
+        addLog("Saving state to local archive...", "success");
         sessionStorage.removeItem('os_events');
         sessionStorage.setItem('enrichedSongs', JSON.stringify(enrichedData.data));
         sessionStorage.setItem('os_collection_name', name);
         
+        addLog("CRITIC_OS Ready. Redirecting to Cognitive_Shell...");
         if (btn) btn.textContent = "[ REDIRECTING... ]";
-        window.location.href = "/analysis";
+        
+        setTimeout(() => {
+            window.location.href = "/analysis";
+        }, 1500);
 
     } catch (err) {
+        addLog(`CRITICAL_FAILURE: ${err.message}`, "error");
         console.error(err);
         alert("CRITICAL_ERROR: " + err.message);
         resetBtn();
+        // Go back to list
+        collectionList.style.display = 'block';
+        if (collectionTitle) collectionTitle.textContent = '// SELECT_DATA_COLLECTION';
     }
 }
 
