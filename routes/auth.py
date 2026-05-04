@@ -192,14 +192,21 @@ def get_collections():
                 total_tracks = tracks_info.get('total') or 0
             
             # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist_items
-            # This handles "Ghost Playlists" where the simplified object is out of sync.
+            # Ref: https://developer.spotify.com/documentation/web-api/reference/get-playlists-items
             if total_tracks == 0:
                 try:
-                    # We only fetch the total field to keep it extremely fast
-                    check = sp.playlist_items(p_id, fields="total", limit=1)
+                    # We specify additional_types='track,episode' to ensure we count EVERYTHING in the playlist.
+                    # We only fetch the 'total' field to keep the payload tiny and fast.
+                    check = sp.playlist_items(
+                        p_id, 
+                        fields="total", 
+                        limit=1, 
+                        additional_types='track,episode'
+                    )
                     if check and isinstance(check, dict) and 'total' in check:
                         total_tracks = check.get('total') or 0
-                except:
+                except Exception as e:
+                    logger.warning(f"Fallback fetch failed for playlist {p_id}: {e}")
                     pass
 
             return {
