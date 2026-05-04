@@ -136,6 +136,8 @@ def get_user():
         "image": image_url
     })
 
+import concurrent.futures
+
 @auth_bp.route("/get-collections")
 def get_collections():
     # Use a tight timeout for the initial collection list
@@ -165,11 +167,9 @@ def get_collections():
         items = playlists_res.get('items', []) if playlists_res else []
 
         playlists = []
-        fallback_count = 0
-        max_fallbacks = 3 # Even tighter limit for sequential calls
-
-        for i, p in enumerate(items):
-            if not p: continue
+        
+        def process_playlist(p):
+            if not p: return None
             
             p_id = p.get('id')
             p_name = p.get('name')
@@ -191,8 +191,8 @@ def get_collections():
                 total_tracks = tracks_info.get('total', 0)
             
             # SAFE FALLBACK: Only for OWNED playlists that show 0
-            if total_tracks == 0 and is_owner and fallback_count < max_fallbacks:
-                fallback_count += 1
+            # We don't need a fallback_count here because we'll run these in parallel
+            if total_tracks == 0 and is_owner:
                 try:
                     # Very fast check
                     check = sp.playlist_items(p_id, fields="total", limit=1)
@@ -201,13 +201,21 @@ def get_collections():
                 except:
                     pass
 
-            playlists.append({
+            return {
                 "id": p_id,
                 "name": p_name,
                 "image": image_url,
                 "total": total_tracks,
                 "is_owner": is_owner
-            })
+            }
+
+        # Use ThreadPoolExecutor to process playlists in parallel
+        # Max workers is small to avoid hitting Spotify rate limits too hard
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(executor.map(process_playlist, items))
+        
+        # Filter out None and sort to maintain original order if needed (map preserves order)
+        playlists = [r for r in results if r is not None]
             
         return jsonify({
             "liked_total": liked_total,
