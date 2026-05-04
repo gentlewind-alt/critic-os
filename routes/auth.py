@@ -30,10 +30,32 @@ SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-li
 
 
 # ==========================
+# CUSTOM CACHE HANDLER
+# ==========================
+from spotipy.cache_handler import CacheHandler
+
+class MemoryCacheHandler(CacheHandler):
+    """
+    A cleaner memory-based cache handler that avoids disk I/O.
+    We manually sync this with the Flask session in the main thread.
+    """
+    def __init__(self, token_info=None):
+        self.token_info = token_info
+
+    def get_cached_token(self):
+        return self.token_info
+
+    def save_token_to_cache(self, token_info):
+        self.token_info = token_info
+
+# ==========================
 # SPOTIFY AUTH SETUP
 # ==========================
 def create_spotify_oauth():
-    cache_handler = FlaskSessionCacheHandler(session)
+    # Retrieve token from session to initialize the memory handler
+    token_info = session.get('spotify_token')
+    cache_handler = MemoryCacheHandler(token_info)
+    
     return SpotifyOAuth(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
@@ -42,7 +64,6 @@ def create_spotify_oauth():
         cache_handler=cache_handler,
         show_dialog=True
     )
-
 
 # ==========================
 # LOGIN ROUTE
@@ -63,6 +84,9 @@ def callback():
     session.clear() 
     code = request.args.get("code")
     token_info = sp_oauth.get_access_token(code)
+    
+    # Persist the token in the session manually
+    session['spotify_token'] = token_info
     return redirect("/")
 
 
@@ -72,13 +96,21 @@ def callback():
 def get_sp_client(timeout=10):
     sp_oauth = create_spotify_oauth()
     try:
-        # Validate token with a shorter timeout
         token = sp_oauth.cache_handler.get_cached_token()
+        if not token:
+            return None
+            
+        # If token is expired, refresh it and update session
+        if sp_oauth.is_token_expired(token):
+            token = sp_oauth.refresh_access_token(token['refresh_token'])
+            session['spotify_token'] = token
+            
         if not sp_oauth.validate_token(token):
             return None
     except:
         return None
-    return spotipy.Spotify(oauth_manager=sp_oauth, requests_timeout=timeout)
+        
+    return spotipy.Spotify(auth=token['access_token'], requests_timeout=timeout)
 
 @auth_bp.route("/debug-token")
 def debug_token():
@@ -166,6 +198,11 @@ def get_collections():
         playlists_res = sp.current_user_playlists(limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
 
+        # Get access token for a session-less client to use in threads
+        token_info = sp.auth_manager.cache_handler.get_cached_token()
+        access_token = token_info.get('access_token')
+        sp_worker = spotipy.Spotify(auth=access_token)
+
         playlists = []
         
         def process_playlist(p):
@@ -197,7 +234,8 @@ def get_collections():
                 try:
                     # We specify additional_types='track,episode' to ensure we count EVERYTHING in the playlist.
                     # We only fetch the 'total' field to keep the payload tiny and fast.
-                    check = sp.playlist_items(
+                    # We use sp_worker here as it doesn't require a Flask request context.
+                    check = sp_worker.playlist_items(
                         p_id, 
                         fields="total", 
                         limit=1, 
@@ -245,6 +283,27 @@ def clean_track_name(name: str) -> str:
     # 3. Final trim
     return name.strip()
 
+def extract_valid_tracks(items):
+    """
+    STRICT LOGIC: Extract valid track objects from Spotify response items.
+    Filters out None, missing data, and local files.
+    """
+    valid_tracks = []
+    for entry in items:
+        # Spotify playlist items wrap the track in 'track' or 'item'
+        track = entry.get('track') or entry.get('item')
+        
+        if not track:
+            continue
+            
+        # Ignore local files as they lack stable IDs/metadata for enrichment
+        if track.get('is_local'):
+            continue
+            
+        valid_tracks.append(track)
+        
+    return valid_tracks
+
 @auth_bp.route("/fetch-collection-songs", methods=["POST"])
 def fetch_collection_songs():
     sp = get_sp_client()
@@ -268,47 +327,43 @@ def fetch_collection_songs():
             return jsonify({"error": "spotify_error", "message": "Spotify returned no data."}), 500
 
         items = pl.get('items', [])
-        logger.info(f"FETCH_DEBUG: Received {len(items)} items from Spotify.")
+        raw_tracks = extract_valid_tracks(items)
+        count = len(raw_tracks)
         
-        if len(items) == 0:
-            logger.warning(f"Collection '{col_name}' is literally empty according to Spotify.")
+        logger.info(f"FETCH_DEBUG: Received {len(items)} items. Valid tracks: {count}")
+        
+        if count == 0:
+            logger.warning(f"Collection '{col_name}' has no usable tracks.")
             return jsonify({
                 "error": "empty_collection", 
-                "message": f"Spotify says your '{col_name}' collection is empty. Make sure you are logged into the right account!"
+                "message": f"Spotify says your '{col_name}' collection has no usable tracks (local files are ignored)."
             }), 400
 
         if len(items) > 0:
             # DEEP DUMP of the first item so we can see the exact structure in Vercel logs
             logger.info(f"RAW_ITEM_DUMP (FIRST): {str(items[0])[:1000]}...")
 
-        raw_tracks = []
-        for index, item in enumerate(items):
-            if not item: continue
-            
-            # UNIVERSAL PARSER: Check all known nesting patterns
-            track_obj = item.get('track') or item.get('item') or item.get('episode')
-            
-            # Fallback: Check if the item itself is the track
-            if not track_obj or not isinstance(track_obj, dict):
-                track_obj = item
-            
+        # We already have raw_tracks filtered by extract_valid_tracks
+        # But we still need to ensure they have names and artists for enrichment
+        processed_tracks = []
+        for index, track_obj in enumerate(raw_tracks):
             t_name = track_obj.get('name')
             t_artists = track_obj.get('artists', [])
             
             if t_name and isinstance(t_artists, list) and len(t_artists) > 0:
-                raw_tracks.append(track_obj)
+                processed_tracks.append(track_obj)
             else:
-                logger.warning(f"Parser skipped item at index {index}: {t_name or 'No Name'}. Type: {track_obj.get('type', 'unknown')}")
+                logger.warning(f"Parser skipped track at index {index}: {t_name or 'No Name'}. Type: {track_obj.get('type', 'unknown')}")
 
-        if not raw_tracks:
-            logger.error(f"Failed to parse any valid tracks from {len(items)} items.")
+        if not processed_tracks:
+            logger.error(f"Failed to parse any usable tracks from {count} candidates.")
             return jsonify({
                 "error": "no_songs_found", 
-                "message": f"Found {len(items)} items, but none matched the music structure. Check your Vercel logs for RAW_ITEM_DUMP."
+                "message": f"Found {count} tracks, but none had valid metadata (name/artist)."
             }), 400
 
-        random.shuffle(raw_tracks)
-        selected_tracks = raw_tracks[:10]
+        random.shuffle(processed_tracks)
+        selected_tracks = processed_tracks[:10]
 
         songs = []
         for track in selected_tracks:
