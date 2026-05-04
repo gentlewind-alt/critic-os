@@ -137,6 +137,9 @@ def get_collections():
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
     try:
+        user = sp.current_user()
+        market = user.get("country")
+        
         liked_total = 0
         try:
             liked_res = sp.current_user_saved_tracks(limit=1)
@@ -150,30 +153,31 @@ def get_collections():
             if not p: continue
             
             image_url = p.get('images')[0].get('url', "") if p.get('images') else ""
-            
+            owner_id = p.get('owner', {}).get('id')
+            is_owner = owner_id == user.get('id')
+
             # Initial count from simplified object
             total_tracks = 0
             tracks_info = p.get('tracks', {})
             if isinstance(tracks_info, dict):
                 total_tracks = tracks_info.get('total', 0)
             
-            # SAFE FALLBACK: If 0, try a quick items check but ignore 403/errors silently
+            # SAFE FALLBACK: If 0, try a quick items check with market
             if total_tracks == 0:
                 try:
-                    # We only request 'total' to keep it fast
-                    check = sp.playlist_items(p.get('id'), fields="total", limit=1)
+                    # Use market to avoid 403s for region-restricted playlists
+                    check = sp.playlist_items(p.get('id'), fields="total", limit=1, market=market)
                     if check and 'total' in check:
                         total_tracks = check['total']
                 except:
-                    # If 403 or other error, we just stick with 0. 
-                    # This prevents the noisy logs while fixing the bug for valid playlists.
                     pass
 
             playlists.append({
                 "id": p.get('id'),
                 "name": p.get('name'),
                 "image": image_url,
-                "total": total_tracks
+                "total": total_tracks,
+                "is_owner": is_owner
             })
             
         return jsonify({
