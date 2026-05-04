@@ -162,8 +162,8 @@ def get_collections():
             liked_total = liked_res.get('total', 0)
         except: pass
 
-        # Reduce limit to 30 for faster initial load on Vercel
-        playlists_res = sp.current_user_playlists(limit=30)
+        # Reduce limit for speed, but keep it high enough to find user playlists
+        playlists_res = sp.current_user_playlists(limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
 
         playlists = []
@@ -178,26 +178,27 @@ def get_collections():
             image_url = ""
             if p.get('images') and len(p.get('images')) > 0:
                 img = p.get('images')[0]
-                if isinstance(img, dict):
-                    image_url = img.get('url', "")
+                if isinstance(img, dict) and img.get('url'):
+                    image_url = img.get('url')
 
             owner_id = p.get('owner', {}).get('id')
             is_owner = owner_id == user_id
 
             # Initial count from simplified object
-            total_tracks = 0
             tracks_info = p.get('tracks', {})
+            total_tracks = 0
             if isinstance(tracks_info, dict):
-                total_tracks = tracks_info.get('total', 0)
+                # Use .get() carefully to handle None values
+                total_tracks = tracks_info.get('total') or 0
             
-            # SAFE FALLBACK: Only for OWNED playlists that show 0
-            # We don't need a fallback_count here because we'll run these in parallel
-            if total_tracks == 0 and is_owner:
+            # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist_items
+            # This handles "Ghost Playlists" where the simplified object is out of sync.
+            if total_tracks == 0:
                 try:
-                    # Very fast check
+                    # We only fetch the total field to keep it extremely fast
                     check = sp.playlist_items(p_id, fields="total", limit=1)
-                    if check and 'total' in check:
-                        total_tracks = check['total']
+                    if check and isinstance(check, dict) and 'total' in check:
+                        total_tracks = check.get('total') or 0
                 except:
                     pass
 
@@ -210,8 +211,8 @@ def get_collections():
             }
 
         # Use ThreadPoolExecutor to process playlists in parallel
-        # Max workers is small to avoid hitting Spotify rate limits too hard
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # Increased max_workers to 10 for better speed when multiple fallbacks are needed
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(process_playlist, items))
         
         # Filter out None and sort to maintain original order if needed (map preserves order)
