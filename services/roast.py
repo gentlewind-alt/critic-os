@@ -163,44 +163,83 @@ def build_profile_prompt(songs: List[Dict], persona: str = "normal", custom_prom
     persona_desc = persona_info["desc"]
 
     # Use custom prompt if provided, otherwise use default savage profile template
-    base_instructions = custom_prompt if custom_prompt else f"""Analyze this user's music taste with a nonchalant, savage tone.
-Mention specific artists they listen to (like {', '.join(top_artists)}) and the emotions you detect ({', '.join(unique_emotions)}).
-
-STRICT TEMPLATE:
-"I see songs from [Artist A] and [Artist B], and you also have [Artist C] in your top listenings. I detect a lot of [Emotion A] and [Emotion B]... are you okay?"
-
-### RULES
-1. PERSONA: You are {persona_desc}.
-2. TONE: Nonchalant, savage, brutally honest.
-3. ENDING: You MUST end the text exactly with the question: "Are you okay?"
-4. LIMIT: Maximum 40 words."""
+    base_instructions = custom_prompt if custom_prompt else f"""Analyze this user's overall music taste with a sharp, judgmental tone. 
+Briefly mention artists like {', '.join(top_artists)} and detect their emotional patterns ({', '.join(unique_emotions)}).
+Use SIMPLE English. MAXIMUM 40 WORDS."""
 
     # Grounding instructions if interaction exists
-    grounding = f"\n### GROUNDING\nThe user {interaction_state} according to their recent response. Weave this into the profile roast nonchalantly." if interaction_state else ""
+    grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state} according to their recent response. You MUST weave this into the profile analysis. It is more important than anything else." if interaction_state else ""
 
     return f"""{base_instructions}{grounding}
 
-### DATA
-{summary}
+### DATA (RECENT HISTORY)
+{chr(10).join(summary)}
 
-Start now."""
+### ROLE (STRICT)
+You are {persona_desc}.
+{persona_style}
+You MUST think and speak like this persona.
+
+Start immediately with the profile roast. No setup."""
 
 
 # ==========================
-# CORE GENERATION (PROFILE STREAMING)
+# CORE GENERATION (PROFILE DRAFT - PASS 1)
 # ==========================
-def generate_profile_roast_stream(songs: List[Dict], persona: str = "normal", custom_prompt: str = None, interaction_state: str = None) -> Generator[str, None, None]:
+def _generate_profile_roast_raw(songs: List[Dict], persona: str = "normal", custom_prompt: str = None, interaction_state: str = None) -> str:
+    """
+    Pass 1: Generate the raw profile roast draft.
+    """
     prompt = build_profile_prompt(songs, persona, custom_prompt, interaction_state)
-    
     try:
         response = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=1.2,
+            temperature=0.7,
             top_p=0.9,
+            max_tokens=150
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Profile Pass 1 Draft Error: {str(e)}")
+        return f"I see songs from {', '.join([s.get('artist_name') for s in songs[:2]])}... I have no words."
 
+# ==========================
+# CORE GENERATION (PROFILE STREAMING - PASS 2)
+# ==========================
+def generate_profile_roast_stream(songs: List[Dict], persona: str = "normal", custom_prompt: str = None, interaction_state: str = None) -> Generator[str, None, None]:
+    """
+    Pass 2: Rewrite the profile roast to be more natural and grounded.
+    """
+    # Step 1: Get raw draft
+    raw_text = _generate_profile_roast_raw(songs, persona, custom_prompt, interaction_state)
+    
+    # Step 2: Build Rewrite Prompt
+    grounding_reminder = f"\n- MANDATORY: Keep the reference to the user's response: '{interaction_state}'" if interaction_state else ""
+    
+    rewrite_prompt = f"""
+Rewrite this overall music profile roast to sound more natural, spontaneous, and less repetitive.
+
+RULES:
+- remove repeated phrasing
+- vary sentence structure
+- keep meaning the same{grounding_reminder}
+- make it sound human and direct
+- MAXIMUM 40 WORDS. 2-3 sentences.
+
+TEXT:
+"{raw_text}"
+
+Start immediately with the refined profile roast."""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": rewrite_prompt}],
+            temperature=0.8,
+            top_p=1.0,
             stream=True,
-            max_tokens=100
+            max_tokens=150
         )
         for chunk in response:
             content = chunk.choices[0].delta.content
@@ -208,8 +247,8 @@ def generate_profile_roast_stream(songs: List[Dict], persona: str = "normal", cu
                 yield content
                     
     except Exception as e:
-        logger.error(f"Groq Stream Error (Profile): {str(e)}")
-        yield f"[GROQ CONNECTION ERROR: {str(e)}]"
+        logger.error(f"Groq Profile Rewrite Stream Error: {str(e)}")
+        yield raw_text # Fallback to raw draft
 
 
 # ==========================
