@@ -161,6 +161,7 @@ def build_profile_prompt(songs: List[Dict], persona: str = "normal", custom_prom
     
     persona_info = PERSONAS.get(persona, PERSONAS["normal"])
     persona_desc = persona_info["desc"]
+    persona_style = persona_info["style"]
 
     # Use custom prompt if provided, otherwise use default savage profile template
     base_instructions = custom_prompt if custom_prompt else f"""Analyze this user's overall music taste with a sharp, judgmental tone. 

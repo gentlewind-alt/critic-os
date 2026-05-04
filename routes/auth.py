@@ -26,7 +26,7 @@ REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/callback
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 
 # Comprehensive scopes for all playlist/library access
-SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-library-read playlist-modify-public playlist-modify-private"
+SCOPE = "user-top-read playlist-read-private playlist-read-collaborative user-library-read playlist-modify-public playlist-modify-private user-read-private"
 
 
 # ==========================
@@ -169,12 +169,13 @@ def get_collections():
                     # This prevents the noisy logs while fixing the bug for valid playlists.
                     pass
 
-            playlists.append({
-                "id": p.get('id'),
-                "name": p.get('name'),
-                "image": image_url,
-                "total": total_tracks
-            })
+            if total_tracks > 0:
+                playlists.append({
+                    "id": p.get('id'),
+                    "name": p.get('name'),
+                    "image": image_url,
+                    "total": total_tracks
+                })
             
         return jsonify({
             "liked_total": liked_total,

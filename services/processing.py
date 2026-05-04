@@ -26,18 +26,24 @@ class LyricFetcher:
         1. Exact match (get_lyrics)
         2. Fuzzy search (search_lyrics)
         """
+        lyrics_data = None
+
+        # STRATEGY 1: Exact Match
         try:
-            # STRATEGY 1: Exact Match
             lyrics_data = self.api.get_lyrics(
                 track_name=track_name,
                 artist_name=artist_name,
                 album_name=album_name,
                 duration=duration
             )
+        except Exception as e:
+            # LrcLibAPI often raises 404 if exact match fails
+            logger.info(f"     ℹ️ Exact match failed (Strategy 1): {e}")
 
-            # STRATEGY 2: Fuzzy Search ( mirrors website behavior)
-            if not lyrics_data:
-                logger.info(f"     🔍 Exact match failed. Searching for: {track_name} — {artist_name}")
+        # STRATEGY 2: Fuzzy Search
+        if not lyrics_data:
+            try:
+                logger.info(f"     🔍 Attempting search (Strategy 2): {track_name} — {artist_name}")
                 # We use a combined query string for the best fuzzy results
                 query = f"{track_name} {artist_name}"
                 search_results = self.api.search_lyrics(query=query)
@@ -49,17 +55,16 @@ class LyricFetcher:
                             lyrics_data = res
                             logger.info(f"     ✅ Found match via search: {res.track_name} by {res.artist_name}")
                             break
+            except Exception as e:
+                logger.warning(f"     ❌ Search failed (Strategy 2): {e}")
 
-            if lyrics_data:
-                return {
-                    "plain_lyrics": lyrics_data.plain_lyrics,
-                    "synced_lyrics": getattr(lyrics_data, 'synced_lyrics', None)
-                }
-            return None
-
-        except Exception as e:
-            logger.warning(f"Lyrics fetch failed: {track_name} - {artist_name} | {e}")
-            return None
+        if lyrics_data:
+            return {
+                "plain_lyrics": lyrics_data.plain_lyrics,
+                "synced_lyrics": getattr(lyrics_data, 'synced_lyrics', None)
+            }
+        
+        return None
 
 
 # ==========================
