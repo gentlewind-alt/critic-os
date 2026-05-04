@@ -19,13 +19,18 @@ This document outlines the edge cases and errors encountered during the developm
     - Updated all backend calls to use `sp.playlist_items()` instead of `sp.playlist_tracks()`.
     - This ensures compatibility with the latest Spotify data models, including those that mix tracks and podcast episodes.
 
-## 3. The "Nesting" Trap (Universal Parser Error)
-- **Symptom:** "No usable tracks found" error even when Spotify successfully returned 20+ items.
-- **Root Cause:** Different Spotify endpoints nest track metadata differently. Some use a `track` key, some use `item`, and others (like search results) return the track object at the root.
-- **Solution: Universal Recursive Parser.**
-    - Implemented a defensive extraction logic that checks keys in order of priority.
-    - **Logic:** `track_obj = item.get('track') or item.get('item') or item.get('episode') or item`
-    - This allows the app to process any collection type (Liked Songs, Playlists, or Podcasts) without structural failures.
+## 3. The "Nesting" Trap (Strict Parser Logic)
+- **Symptom:** "No usable tracks found" error even when Spotify successfully returned items.
+- **Root Cause:** Different Spotify endpoints nest track metadata differently. Some use a `track` key, while others use `item`. If you only read `track`, you will incorrectly think playlists are empty.
+- **Solution: Strict Extraction Helper.**
+    - Implemented a mandatory `extract_valid_tracks` helper that handles both nesting patterns and filters invalid entries.
+    - **Logic (Strict):**
+      ```python
+      track = item.get('track') or item.get('item')
+      if not track or track.get('is_local'):
+          continue
+      ```
+    - This ensures that only valid, cloud-hosted tracks with full metadata are passed to the analysis engine.
 
 ## 4. Metadata "Noise" causing Analysis Failure
 - **Symptom:** Tracks were fetched but the analysis page skipped them or showed "Empty Analysis."
@@ -34,12 +39,19 @@ This document outlines the edge cases and errors encountered during the developm
     - Added a Regex-based cleaning function (`clean_track_name`) that strips everything inside parentheses/brackets and removes common suffixes like "Remastered," "Deluxe," or "Live."
     - This increases the "hit rate" for lyric matching by over 40%.
 
-## 5. Local File & Unavailable Track Restrictions
-- **Symptom:** Specific playlists failed because they contained "Local Files" (MP3s uploaded from a PC) which lack a Spotify Global ID.
-- **Root Cause:** The system was strictly requiring a `spotify_id` to proceed.
-- **Solution: Relaxed ID Validation.**
-    - Modified the fetcher to prioritize `Name + Artist` over `ID`.
-    - If a track has no ID but has valid text metadata, it is passed through. This allows our system to attempt a "fuzzy match" on Last.fm and our local joke database even for local or restricted files.
+## 5. Local File Restrictions
+- **Symptom:** Specific playlists failed or enrichment crashed because they contained "Local Files" (MP3s uploaded from a PC) which lack stable IDs and global metadata.
+- **Root Cause:** Local files do not have valid data for Last.fm or Lyric lookups.
+- **Solution: Explicit Local Exclusion.**
+    - The `extract_valid_tracks` logic now explicitly skips any entry where `is_local` is true.
+    - This prevents the "No usable tracks found" error from being masked by invalid local entries that would fail later in the pipeline anyway.
+
+## 6. Request Context vs. Threading Conflict
+- **Symptom:** `Working outside of request context` error during playlist collection fetching.
+- **Root Cause:** We used `ThreadPoolExecutor` to speed up playlist processing. However, the app was using `FlaskSessionCacheHandler`, which stores tokens in the Flask `session`. Background threads do not have access to the active HTTP request context or session.
+- **Solution: Local Cache + Session-less Workers.**
+    - **Storage Switch:** Reverted from `FlaskSessionCacheHandler` to the default file-based cache (`.cache`). This allows background threads to read token data directly from the disk.
+    - **Worker Isolation:** In `get_collections`, we extract the `access_token` in the main thread and pass it to a "session-less" `spotipy.Spotify(auth=token)` client used specifically by the workers.
 
 ---
 

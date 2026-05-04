@@ -85,6 +85,7 @@ def build_prompt(song: Dict, persona: str = "normal", custom_prompt: str = None,
     track = song.get("track_name", "Unknown Track")
     artist = song.get("artist_name", "Unknown Artist")
     lyrics = song.get("plain_lyrics", "")[:1000]
+    lyrics_found = song.get("lyrics_found", bool(lyrics))
 
     # Metadata for better context
     song_emotions = song.get("Emotion", ["neutral"])
@@ -106,10 +107,17 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
     persona_desc = persona_info["desc"]
     persona_style = persona_info["style"]
 
-    base_instructions = custom_prompt if custom_prompt else "Analyze the user’s vibe based on this song and generate a natural, flowing roast. Use SIMPLE English. MAXIMUM 40 WORDS."
+    if custom_prompt:
+        base_instructions = custom_prompt
+    elif not lyrics_found:
+        base_instructions = f"The lyrics for this song are missing from the database. Sardonically roast the user for listening to such an obscure, untraceable, or 'underground' song. Make a creative excuse about why you won't analyze it deeply. Use SIMPLE English. MAXIMUM 40 WORDS."
+    else:
+        base_instructions = "Analyze the user’s vibe based on this song and generate a natural, flowing roast. Use SIMPLE English. MAXIMUM 40 WORDS."
 
     # Grounding instructions if interaction exists
     grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state} according to their recent response. You MUST weave this into the roast. It is more important than the humor reference." if interaction_state else ""
+
+    lyrics_section = f"### LYRICS\n{lyrics}" if lyrics_found else "### LYRICS\n[LYRICS NOT FOUND: SONG TOO OBSCURE]"
 
     return f"""{base_instructions}{grounding}{joke_instruction}
 
@@ -117,8 +125,7 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
 Track: "{track}" by {artist}
 Vibe: {emotions_str}
 
-### LYRICS
-{lyrics}
+{lyrics_section}
 
 ### ROLE (STRICT)
 You are {persona_desc}.
