@@ -69,11 +69,16 @@ def callback():
 # ==========================
 # AUTH HELPERS
 # ==========================
-def get_sp_client():
+def get_sp_client(timeout=10):
     sp_oauth = create_spotify_oauth()
-    if not sp_oauth.validate_token(sp_oauth.cache_handler.get_cached_token()):
+    try:
+        # Validate token with a shorter timeout
+        token = sp_oauth.cache_handler.get_cached_token()
+        if not sp_oauth.validate_token(token):
+            return None
+    except:
         return None
-    return spotipy.Spotify(oauth_manager=sp_oauth)
+    return spotipy.Spotify(oauth_manager=sp_oauth, requests_timeout=timeout)
 
 @auth_bp.route("/debug-token")
 def debug_token():
@@ -133,12 +138,21 @@ def get_user():
 
 @auth_bp.route("/get-collections")
 def get_collections():
-    sp = get_sp_client()
+    # Use a tight timeout for the initial collection list
+    sp = get_sp_client(timeout=10)
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
     try:
-        user = sp.current_user()
-        market = user.get("country")
+        # Use session to cache user info for speed
+        user_id = session.get('user_id')
+        market = session.get('market')
+        
+        if not user_id or not market:
+            user = sp.current_user()
+            user_id = user.get('id')
+            market = user.get("country")
+            session['user_id'] = user_id
+            session['market'] = market
         
         liked_total = 0
         try:
@@ -146,15 +160,29 @@ def get_collections():
             liked_total = liked_res.get('total', 0)
         except: pass
 
-        playlists_res = sp.current_user_playlists(limit=50)
+        # Reduce limit to 30 for faster initial load on Vercel
+        playlists_res = sp.current_user_playlists(limit=30)
+        items = playlists_res.get('items', []) if playlists_res else []
+
         playlists = []
-        
-        for p in playlists_res.get('items', []):
+        fallback_count = 0
+        max_fallbacks = 3 # Even tighter limit for sequential calls
+
+        for i, p in enumerate(items):
             if not p: continue
             
-            image_url = p.get('images')[0].get('url', "") if p.get('images') else ""
+            p_id = p.get('id')
+            p_name = p.get('name')
+            
+            # Defensive image parsing
+            image_url = ""
+            if p.get('images') and len(p.get('images')) > 0:
+                img = p.get('images')[0]
+                if isinstance(img, dict):
+                    image_url = img.get('url', "")
+
             owner_id = p.get('owner', {}).get('id')
-            is_owner = owner_id == user.get('id')
+            is_owner = owner_id == user_id
 
             # Initial count from simplified object
             total_tracks = 0
@@ -162,19 +190,20 @@ def get_collections():
             if isinstance(tracks_info, dict):
                 total_tracks = tracks_info.get('total', 0)
             
-            # SAFE FALLBACK: If 0, try a quick items check with market
-            if total_tracks == 0:
+            # SAFE FALLBACK: Only for OWNED playlists that show 0
+            if total_tracks == 0 and is_owner and fallback_count < max_fallbacks:
+                fallback_count += 1
                 try:
-                    # Use market to avoid 403s for region-restricted playlists
-                    check = sp.playlist_items(p.get('id'), fields="total", limit=1, market=market)
+                    # Very fast check
+                    check = sp.playlist_items(p_id, fields="total", limit=1)
                     if check and 'total' in check:
                         total_tracks = check['total']
                 except:
                     pass
 
             playlists.append({
-                "id": p.get('id'),
-                "name": p.get('name'),
+                "id": p_id,
+                "name": p_name,
                 "image": image_url,
                 "total": total_tracks,
                 "is_owner": is_owner

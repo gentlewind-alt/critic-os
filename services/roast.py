@@ -22,8 +22,14 @@ GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"#"llama-3.3-70b-versatil
 # ==========================
 JOKES_BY_EMOTION = {}
 
+load_jokes_called = False
+
 def load_jokes():
-    global JOKES_BY_EMOTION
+    global JOKES_BY_EMOTION, load_jokes_called
+    if load_jokes_called:
+        return
+    load_jokes_called = True
+    
     file_path = "jokes_with_emotions.csv"
     if not os.path.exists(file_path):
         logger.warning(f"Jokes dataset not found at {file_path}. Humor injection disabled.")
@@ -44,9 +50,10 @@ def load_jokes():
     except Exception as e:
         logger.error(f"Error loading jokes dataset: {e}")
 
-load_jokes()
+# load_jokes() # REMOVED: Load lazily in get_random_joke
 
 def get_random_joke(emotion: str) -> str:
+    load_jokes() # Lazy load
     jokes = JOKES_BY_EMOTION.get(emotion, JOKES_BY_EMOTION.get('neutral', []))
     if not jokes:
         return ""
