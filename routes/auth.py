@@ -126,13 +126,18 @@ def debug_token():
     sp_oauth = create_spotify_oauth()
     token_info = sp_oauth.cache_handler.get_cached_token()
     if not token_info:
-        return jsonify({"status": "no token found in redis"})
+        return jsonify({
+            "status": "no token found",
+            "cache_key": f"spotify_token:{session.get('cache_id')}",
+            "session_keys": list(session.keys())
+        })
     
     return jsonify({
         "status": "authenticated",
         "active_scopes": token_info.get("scope", "unknown"),
         "expires_at": token_info.get("expires_at"),
-        "is_expired": token_info.get("expires_at", 0) < datetime.now().timestamp()
+        "is_expired": token_info.get("expires_at", 0) < datetime.now().timestamp(),
+        "cache_id": session.get('cache_id')
     })
 
 @auth_bp.route("/logout")
@@ -476,6 +481,10 @@ def fetch_lyrics():
     return jsonify({
         "timestamp": datetime.now().isoformat(),
         "total_songs": len(final_data),
+        "songs_with_lyrics": len([s for s in final_data if s.get("lyrics_found")]),
+        "data": final_data
+    })
+total_songs": len(final_data),
         "songs_with_lyrics": len([s for s in final_data if s.get("lyrics_found")]),
         "data": final_data
     })
