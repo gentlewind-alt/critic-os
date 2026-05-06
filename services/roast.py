@@ -145,7 +145,7 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
 
 ### DATA
 Track: "{track}" by {artist}
-Vibe: {emotions_str}
+{metadata_context}
 
 {lyrics_section}
 
@@ -476,6 +476,16 @@ Start immediately with the refined verdict."""
             temperature=0.7,
             top_p=1.0,
             stream=True,
+            max_tokens=100
+        )
+        for chunk in response:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
+    except Exception as e:
+        logger.error(f"Verdict Rewrite Error: {str(e)}")
+        yield raw_verdict # Fallback to raw draft
+True,
             max_tokens=100
         )
         for chunk in response:
