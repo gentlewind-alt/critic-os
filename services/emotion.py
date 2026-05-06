@@ -1,5 +1,7 @@
 # app/services/emotion.py
 
+import hashlib
+from services.cache import cache_get, cache_set
 import os
 import logging
 import requests
@@ -34,6 +36,15 @@ def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
             "emotions_detected": {},
             "Emotion": ["neutral"]
         }
+
+    # Use SHA256 of lyrics as cache key
+    lyrics_hash = hashlib.sha256(lyrics.encode('utf-8')).hexdigest()
+    cache_key = f"emotion:{lyrics_hash}"
+    
+    cached = cache_get(cache_key)
+    if cached:
+        logger.info(f"     ✅ Found emotion analysis in Redis cache")
+        return cached
 
     if not HF_TOKEN:
         logger.warning("HUGGINGFACE_TOKEN not found in environment variables. Emotion analysis will default to 'neutral'.")
@@ -76,10 +87,14 @@ def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
             detected = dict(sorted(detected.items(), key=lambda x: x[1], reverse=True))
             emotion_list = list(detected.keys()) if detected else ["neutral"]
             
-            return {
+            result = {
                 "emotions_detected": detected,
                 "Emotion": emotion_list
             }
+            
+            # Cache for 30 days
+            cache_set(cache_key, result, ex=2592000)
+            return result
             
     except Exception as e:
         logger.error(f"HF Inference API Error: {e}")

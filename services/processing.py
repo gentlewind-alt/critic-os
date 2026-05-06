@@ -1,5 +1,6 @@
 # app/services/processing.py
 
+from services.cache import cache_get, cache_set
 from lrclib import LrcLibAPI
 from typing import Optional, Dict, List
 import logging
@@ -26,6 +27,13 @@ class LyricFetcher:
         1. Exact match (get_lyrics)
         2. Fuzzy search (search_lyrics)
         """
+        # Check Redis cache first
+        cache_key = f"lyrics:{artist_name}:{track_name}".lower()
+        cached = cache_get(cache_key)
+        if cached:
+            logger.info(f"     ✅ Found lyrics in Redis cache: {track_name}")
+            return cached
+
         lyrics_data = None
 
         # STRATEGY 1: Exact Match
@@ -59,10 +67,13 @@ class LyricFetcher:
                 logger.warning(f"     ❌ Search failed (Strategy 2): {e}")
 
         if lyrics_data:
-            return {
+            result = {
                 "plain_lyrics": lyrics_data.plain_lyrics,
                 "synced_lyrics": getattr(lyrics_data, 'synced_lyrics', None)
             }
+            # Cache the result for 7 days
+            cache_set(cache_key, result, ex=604800)
+            return result
         
         return None
 

@@ -1,15 +1,13 @@
+import os
+from dotenv import load_dotenv
+
+# Load environment variables FIRST before any other imports
+load_dotenv()
+
 from flask import Flask, Response, render_template, request
 from flask_session import Session
 import redis
 import json
-
-from services.pipeline import run_pipeline_optimized
-from routes.auth import auth_bp
-import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -17,13 +15,11 @@ app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 # ==========================
 # REDIS SESSION CONFIG
 # ==========================
+from services.cache import redis_client_raw
 app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_PERMANENT'] = True
 app.config['SESSION_USE_SIGNER'] = True
-
-# Use the Redis URL provided by the user (fallback to local if not set)
-redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+app.config['SESSION_REDIS'] = redis_client_raw
 
 # Initialize Session
 Session(app)
