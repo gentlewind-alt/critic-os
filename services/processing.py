@@ -119,18 +119,19 @@ def process_song(song: Dict, fetcher: LyricFetcher) -> Dict:
     }
 
 
+import concurrent.futures
+
 # ==========================
 # OPTIONAL: NON-STREAM MODE
 # ==========================
 def process_songs_batch(songs: List[Dict]) -> List[Dict]:
     """
-    If you need full result (non-stream)
+    Parallelized processing of songs to fetch lyrics.
     """ 
-
     fetcher = LyricFetcher()
-    results = []
 
-    for song in songs:
-        results.append(process_song(song, fetcher))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # Wrap each song in a partial call if needed, but here process_song handles it
+        results = list(executor.map(lambda s: process_song(s, fetcher), songs))
 
     return results
