@@ -369,18 +369,20 @@ def get_collections():
 
             # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist()
             if total_tracks == 0:
-                # Targeted call for speed - using playlist() which is often more reliable for metadata
+                # Targeted call for speed - using playlist()
                 try:
                     check = debug_spotify_request(
                         "playlist",
                         sp_worker,
                         p_id, 
-                        fields="tracks.total",
                         debug_token_info=token_info # Pass token info as threads can't access session
                     )
 
-                    if check and isinstance(check, dict) and 'tracks' in check:
-                        total_tracks = check.get('tracks', {}).get('total') or 0
+                    if check and isinstance(check, dict):
+                        # DEEP LOG: See what the count actually is
+                        tracks_obj = check.get('tracks', {})
+                        total_tracks = tracks_obj.get('total') or 0
+                        logger.info(f"FALLBACK RESULT for {p_name}: Found {total_tracks} tracks (Raw keys: {list(check.keys())})")
                 except Exception as e:
                     # Log only, don't crash the whole list
                     status = getattr(e, 'http_status', 'UNKNOWN')
