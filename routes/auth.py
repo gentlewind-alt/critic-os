@@ -300,40 +300,17 @@ import concurrent.futures
 
 @auth_bp.route("/get-collections")
 def get_collections():
-    # Use a tight timeout for the initial collection list (Vercel has 10s limit)
-    sp = get_sp_client(timeout=5)
+    # Use a slightly longer timeout for Vercel stability
+    sp = get_sp_client(timeout=10)
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
-    # Verify Redis configuration for Vercel
-    if not os.getenv('REDIS_URL') and (os.getenv('VERCEL') == '1' or os.getenv('VERCEL_ENV')):
-        logger.error("REDIS_URL is missing in Vercel environment! Sessions will be unstable.")
-
     try:
-        # Get a fresh, VALIDATED token for background workers
+        # Get token info for logging purposes in debug_spotify_request
         sp_oauth = create_spotify_oauth()
         token_info = sp_oauth.cache_handler.get_cached_token()
         
-        # Refresh if needed before passing to workers
-        if token_info and sp_oauth.is_token_expired(token_info):
-            logger.info("Token expired for workers, refreshing...")
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-            
-        access_token = token_info.get('access_token') if token_info else None
-
-        if not access_token:
-            logger.error("Failed to extract valid access token for background workers.")
-            return jsonify({"error": "token_extraction_failed"}), 500
-
-        # Worker client with shared session
-        sp_worker = spotipy.Spotify(
-            auth=access_token, 
-            requests_timeout=3,
-            requests_session=spotify_session
-        )
-
-        # Use session to cache user info for speed
+        # Ensure user_id is in session
         user_id = session.get('user_id')
-
         if not user_id:
             user = debug_spotify_request("current_user", sp)
             user_id = user.get('id')
@@ -370,24 +347,28 @@ def get_collections():
             tracks_info = p.get('tracks', {})
             total_tracks = 0
             if isinstance(tracks_info, dict):
-                total_tracks = tracks_info.get('total', 0)
+                # Use .get() carefully; sometimes Spotify returns None for fields
+                total_tracks = tracks_info.get('total', 0) or 0
 
-            # 2. Safety Fallback: Only if total is 0, try a deep fetch via playlist_items(limit=1)
-            # This is more efficient than fetching the full playlist object
+            # 2. Safety Fallback: If total is 0, try a deep fetch via playlist() with fields
+            # We use the main 'sp' client here as it's thread-safe for reading with a static token
             if total_tracks == 0:
                 try:
+                    # Requesting only the tracks.total field for speed
                     check = debug_spotify_request(
-                        "playlist_items", 
-                        sp_worker, 
+                        "playlist", 
+                        sp, 
                         p_id, 
-                        fields="total",
-                        limit=1,
+                        fields="tracks.total",
                         debug_token_info=token_info
                     )
                     if check and isinstance(check, dict):
-                        total_tracks = check.get('total', 0)
-                        if total_tracks > 0:
-                            logger.info(f"FALLBACK SUCCESS for {p_name}: {total_tracks} tracks found.")
+                        # Response structure for fields="tracks.total" is {"tracks": {"total": ...}}
+                        deep_tracks = check.get('tracks', {})
+                        if isinstance(deep_tracks, dict):
+                            total_tracks = deep_tracks.get('total', 0) or 0
+                            if total_tracks > 0:
+                                logger.info(f"FALLBACK SUCCESS for {p_name}: {total_tracks} tracks found.")
                 except Exception as e:
                     logger.debug(f"Metadata fallback failed for {p_name}: {e}")
 
@@ -401,7 +382,8 @@ def get_collections():
             }
 
         # Use ThreadPoolExecutor to process playlists in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        # We use the existing 'sp' client which is already initialized with the token
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(process_playlist, items))
 
         playlists = [r for r in results if r is not None]
@@ -413,6 +395,7 @@ def get_collections():
     except Exception as e:
         logger.error(f"Collections fetch error: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 
 def clean_track_name(name: str) -> str:
