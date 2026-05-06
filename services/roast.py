@@ -122,9 +122,15 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
     if custom_prompt:
         base_instructions = custom_prompt
     elif not lyrics_found:
-        base_instructions = f"The lyrics for this song are missing from the database. Sardonically roast the user for listening to such an obscure, untraceable, or 'underground' song. Make a creative excuse about why you won't analyze it deeply. Use SIMPLE English. MAXIMUM 40 WORDS."
+        base_instructions = f"The lyrics for this song are missing. Sardonically roast the user for listening to such an obscure or untraceable track. Use SIMPLE English. MAXIMUM 40 WORDS."
     else:
-        base_instructions = "Analyze the user’s vibe based on this song and generate a natural, flowing roast. Use SIMPLE English. MAXIMUM 40 WORDS."
+        base_instructions = """Analyze the user's vibe based on this song. 
+        CRITICAL RULES:
+        1. MUST reference or twist at least one lyric.
+        2. MUST reuse 2-5 exact words from the lyrics.
+        3. Be conversational, informal, and highly aggressive.
+        4. Use biting insults. Avoid generic words like 'garbage' or 'trash'.
+        5. Use SIMPLE English. MAXIMUM 40 WORDS."""
 
     # Grounding instructions if interaction exists
     grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state} according to their recent response. You MUST weave this into the roast. It is more important than the humor reference." if interaction_state else ""
