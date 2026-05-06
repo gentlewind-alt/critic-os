@@ -484,7 +484,3 @@ def fetch_lyrics():
         "songs_with_lyrics": len([s for s in final_data if s.get("lyrics_found")]),
         "data": final_data
     })
-total_songs": len(final_data),
-        "songs_with_lyrics": len([s for s in final_data if s.get("lyrics_found")]),
-        "data": final_data
-    })
