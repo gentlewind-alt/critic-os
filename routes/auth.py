@@ -21,6 +21,105 @@ auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
 
 # ==========================
+# DEBUG HELPER
+# ==========================
+def debug_spotify_request(method_name, sp, *args, **kwargs):
+    """
+    Wraps Spotify API calls with detailed logging for debugging.
+    """
+    is_vercel = os.getenv("VERCEL") == "1" or os.getenv("VERCEL_ENV") is not None
+    env = "vercel" if is_vercel else "local"
+    
+    # Attempt to get token info for scopes and masking
+    token_info = None
+    try:
+        # We try to get it from the session if possible
+        sp_oauth = create_spotify_oauth()
+        token_info = sp_oauth.cache_handler.get_cached_token()
+    except Exception:
+        pass
+
+    # Fallback: try to get token from the sp object itself
+    access_token = "N/A"
+    if hasattr(sp, 'auth'):
+        access_token = sp.auth
+    elif hasattr(sp, 'auth_manager') and hasattr(sp.auth_manager, 'get_cached_token'):
+        t = sp.auth_manager.get_cached_token()
+        if t: access_token = t.get('access_token', 'N/A')
+    
+    if access_token == "N/A" and token_info:
+        access_token = token_info.get("access_token", "N/A")
+
+    scopes = token_info.get("scope", "N/A") if token_info else "N/A"
+    
+    def mask_token(t):
+        if not t or t == "N/A": return "N/A"
+        if len(t) < 15: return t
+        return f"{t[:7]}...{t[-4:]}"
+
+    # Mapping methods to endpoints for clearer logs
+    mapping = {
+        "playlist_items": ("GET", "https://api.spotify.com/v1/playlists/{}/items"),
+        "current_user_saved_tracks": ("GET", "https://api.spotify.com/v1/me/tracks"),
+        "current_user_playlists": ("GET", "https://api.spotify.com/v1/me/playlists"),
+        "playlist": ("GET", "https://api.spotify.com/v1/playlists/{}"),
+        "current_user_top_tracks": ("GET", "https://api.spotify.com/v1/me/top/tracks"),
+        "current_user": ("GET", "https://api.spotify.com/v1/me"),
+    }
+    
+    http_method, url_template = mapping.get(method_name, ("UNKNOWN", "https://api.spotify.com/v1/..."))
+    
+    url = url_template
+    if "{}" in url_template:
+        if len(args) > 0:
+            url = url_template.format(args[0])
+        elif 'playlist_id' in kwargs:
+            url = url_template.format(kwargs['playlist_id'])
+
+    # LOGGING
+    log_header = f"\n[SPOTIFY REQUEST] [{env.upper()}]"
+    log_body = (
+        f"METHOD: {http_method}\n"
+        f"URL: {url}\n"
+        f"PARAMS: {kwargs}\n"
+        f"SCOPES: {scopes}\n"
+        f"TOKEN: {mask_token(access_token)}"
+    )
+    logger.info(f"{log_header}\n{log_body}")
+    
+    try:
+        func = getattr(sp, method_name)
+        result = func(*args, **kwargs)
+        logger.info(f"[SPOTIFY SUCCESS] {method_name} call completed. TOKEN_USED: {mask_token(access_token)}")
+        return result
+    except Exception as e:
+        status = getattr(e, 'http_status', 'UNKNOWN')
+        # Improved error body capture
+        body = "N/A"
+        if hasattr(e, 'msg'):
+            body = e.msg
+        elif hasattr(e, 'args') and len(e.args) > 0:
+            body = str(e.args[0])
+            
+        # For SpotifyException, we can often get more details
+        if hasattr(e, 'headers'):
+            logger.debug(f"Error Headers: {e.headers}")
+            
+        err_msg = (
+            f"\n[SPOTIFY ERROR] [{env.upper()}]\n"
+            f"STATUS: {status}\n"
+            f"BODY: {body}\n"
+            f"METHOD: {http_method}\n"
+            f"URL: {url}\n"
+            f"TOKEN_USED: {mask_token(access_token)}"
+        )
+        if method_name == "playlist_items" and len(args) > 0:
+            err_msg += f"\nPLAYLIST_ID: {args[0]}"
+            
+        logger.error(err_msg)
+        raise e
+
+# ==========================
 # ENV CONFIG (IMPORTANT)
 # ==========================
 def get_spotify_config():
@@ -161,7 +260,7 @@ def get_user_top_tracks():
     if not sp: return jsonify({"error": "not logged in"}), 401
 
     try:
-        results = sp.current_user_top_tracks(limit=5, time_range='medium_term')
+        results = debug_spotify_request("current_user_top_tracks", sp, limit=5, time_range='medium_term')
         tracks = []
         for t in results['items']:
             tracks.append({
@@ -177,7 +276,7 @@ def get_user_top_tracks():
 def get_user():
     sp = get_sp_client()
     if not sp: return jsonify({"error": "not logged in"}), 401
-    user = sp.current_user()
+    user = debug_spotify_request("current_user", sp)
     images = user.get("images", [])
     image_url = images[0]["url"] if images else None
     return jsonify({
@@ -214,18 +313,18 @@ def get_collections():
         user_id = session.get('user_id')
 
         if not user_id:
-            user = sp.current_user()
+            user = debug_spotify_request("current_user", sp)
             user_id = user.get('id')
             session['user_id'] = user_id
 
         liked_total = 0
         try:
-            liked_res = sp.current_user_saved_tracks(limit=1)
+            liked_res = debug_spotify_request("current_user_saved_tracks", sp, limit=1)
             liked_total = liked_res.get('total', 0)
         except: pass
 
         # Reduce limit for speed, but keep it high enough to find user playlists
-        playlists_res = sp.current_user_playlists(limit=50)
+        playlists_res = debug_spotify_request("current_user_playlists", sp, limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
 
         def process_playlist(p):
@@ -252,21 +351,23 @@ def get_collections():
                 # Use .get() carefully to handle None values
                 total_tracks = tracks_info.get('total') or 0
 
-            # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist_items
+            # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist()
             if total_tracks == 0:
-                # Targeted call for speed
+                # Targeted call for speed - using playlist() which is often more reliable for metadata
                 try:
-                    check = sp_worker.playlist_items(
+                    check = debug_spotify_request(
+                        "playlist",
+                        sp_worker,
                         p_id, 
-                        fields="total", 
-                        limit=1, 
-                        additional_types=['track']
+                        fields="tracks.total"
                     )
 
-                    if check and isinstance(check, dict) and 'total' in check:
-                        total_tracks = check.get('total') or 0
+                    if check and isinstance(check, dict) and 'tracks' in check:
+                        total_tracks = check.get('tracks', {}).get('total') or 0
                 except Exception as e:
-                    logger.debug(f"Metadata fallback failed for {p_name}: {e}")
+                    # Log only, don't crash the whole list
+                    status = getattr(e, 'http_status', 'UNKNOWN')
+                    logger.debug(f"Metadata fallback failed for {p_name} (Status: {status}): {e}")
 
             return {
                 "id": p_id,
@@ -340,9 +441,9 @@ def fetch_collection_songs():
     logger.info(f"REDIRECT_URI_USED: {redirect_uri}")
     try:
         if col_id == "liked":
-            pl = sp.current_user_saved_tracks(limit=50)
+            pl = debug_spotify_request("current_user_saved_tracks", sp, limit=50)
         else:
-            pl = sp.playlist_items(col_id, limit=50)
+            pl = debug_spotify_request("playlist_items", sp, col_id, limit=50)
             
         if not pl:
             logger.error("Spotify API returned None for the collection.")

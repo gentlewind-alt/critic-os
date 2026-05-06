@@ -139,6 +139,7 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
     # Grounding instructions if interaction exists
     grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state} according to their recent response. You MUST weave this into the roast. It is more important than the humor reference." if interaction_state else ""
 
+    metadata_context = f"Vibe: {emotions_str}"
     lyrics_section = f"### LYRICS\n{lyrics}" if lyrics_found else "### LYRICS\n[LYRICS NOT FOUND: SONG TOO OBSCURE]"
 
     return f"""{base_instructions}{grounding}{joke_instruction}
@@ -476,16 +477,6 @@ Start immediately with the refined verdict."""
             temperature=0.7,
             top_p=1.0,
             stream=True,
-            max_tokens=100
-        )
-        for chunk in response:
-            content = chunk.choices[0].delta.content
-            if content:
-                yield content
-    except Exception as e:
-        logger.error(f"Verdict Rewrite Error: {str(e)}")
-        yield raw_verdict # Fallback to raw draft
-True,
             max_tokens=100
         )
         for chunk in response:
