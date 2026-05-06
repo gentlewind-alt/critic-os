@@ -30,18 +30,20 @@ def debug_spotify_request(method_name, sp, *args, **kwargs):
     is_vercel = os.getenv("VERCEL") == "1" or os.getenv("VERCEL_ENV") is not None
     env = "vercel" if is_vercel else "local"
     
-    # Attempt to get token info for scopes and masking
-    token_info = None
-    try:
-        # We try to get it from the session if possible
-        sp_oauth = create_spotify_oauth()
-        token_info = sp_oauth.cache_handler.get_cached_token()
-    except Exception:
-        pass
+    # Check if token_info was passed explicitly (for workers)
+    token_info = kwargs.pop('debug_token_info', None)
+    
+    # Attempt to get token info from session if not provided
+    if not token_info:
+        try:
+            sp_oauth = create_spotify_oauth()
+            token_info = sp_oauth.cache_handler.get_cached_token()
+        except Exception:
+            pass
 
     # Fallback: try to get token from the sp object itself
     access_token = "N/A"
-    if hasattr(sp, 'auth'):
+    if hasattr(sp, 'auth') and sp.auth:
         access_token = sp.auth
     elif hasattr(sp, 'auth_manager') and hasattr(sp.auth_manager, 'get_cached_token'):
         t = sp.auth_manager.get_cached_token()
@@ -316,8 +318,12 @@ def get_collections():
             logger.error("Failed to extract access token for background workers from session.")
             return jsonify({"error": "token_extraction_failed"}), 500
 
-        # Worker client with shorter timeout for faster fallback checks
-        sp_worker = spotipy.Spotify(auth=access_token, requests_timeout=3)
+        # Worker client with shorter timeout and SHARED SESSION for pool optimization
+        sp_worker = spotipy.Spotify(
+            auth=access_token, 
+            requests_timeout=3,
+            requests_session=spotify_session
+        )
 
         # Use session to cache user info for speed
         user_id = session.get('user_id')
@@ -369,7 +375,8 @@ def get_collections():
                         "playlist",
                         sp_worker,
                         p_id, 
-                        fields="tracks.total"
+                        fields="tracks.total",
+                        debug_token_info=token_info # Pass token info as threads can't access session
                     )
 
                     if check and isinstance(check, dict) and 'tracks' in check:
