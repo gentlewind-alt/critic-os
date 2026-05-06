@@ -198,6 +198,12 @@ def callback():
 # ==========================
 # AUTH HELPERS
 # ==========================
+# Create a shared session with an increased connection pool to handle parallel workers
+spotify_session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+spotify_session.mount("https://", adapter)
+spotify_session.mount("http://", adapter)
+
 def get_sp_client(timeout=10):
     sp_oauth = create_spotify_oauth()
     try:
@@ -214,8 +220,12 @@ def get_sp_client(timeout=10):
         if not sp_oauth.validate_token(token):
             return None
             
-        # Return client with the refreshed token
-        return spotipy.Spotify(auth=token['access_token'], requests_timeout=timeout)
+        # Return client with the refreshed token and shared session
+        return spotipy.Spotify(
+            auth=token['access_token'], 
+            requests_timeout=timeout,
+            requests_session=spotify_session
+        )
     except Exception as e:
         logger.error(f"Failed to initialize Spotify client: {e}")
         return None
