@@ -30,9 +30,13 @@ def load_jokes():
         return
     load_jokes_called = True
     
-    file_path = "jokes_with_emotions.csv"
+    file_path = "jokes_subset.csv"
     if not os.path.exists(file_path):
-        logger.warning(f"Jokes dataset not found at {file_path}. Humor injection disabled.")
+        # Fallback to full file if subset is missing
+        file_path = "jokes_with_emotions.csv"
+    
+    if not os.path.exists(file_path):
+        logger.warning(f"Jokes dataset not found. Humor injection disabled.")
         return
 
     try:

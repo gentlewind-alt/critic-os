@@ -477,7 +477,8 @@ def decide_sarcasm_params(tags, playcount):
 def fetch_lyrics():
     songs = request.json.get("songs", [])
     enriched = process_songs_batch(songs)
-    final_data = [process_song_emotion(s) for s in enriched]
+    # Parallelized emotion analysis
+    final_data = process_emotions_batch(enriched)
     return jsonify({
         "timestamp": datetime.now().isoformat(),
         "total_songs": len(final_data),

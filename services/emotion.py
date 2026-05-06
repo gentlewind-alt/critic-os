@@ -99,10 +99,18 @@ def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
     except Exception as e:
         logger.error(f"HF Inference API Error: {e}")
         
-    return {
-        "emotions_detected": {},
-        "Emotion": ["neutral"]
-    }
+import concurrent.futures
+
+# ==========================
+# BATCH PROCESSING
+# ==========================
+def process_emotions_batch(songs: List[Dict]) -> List[Dict]:
+    """
+    Parallelized emotion detection for a batch of songs.
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(process_song_emotion, songs))
+    return results
 
 
 # ==========================
