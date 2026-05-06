@@ -4,7 +4,7 @@ from datetime import datetime
 import re
 
 from flask import Blueprint, redirect, request, jsonify, session
-from services.emotion import process_song_emotion
+from services.emotion import process_song_emotion, process_emotions_batch
 from services.processing import process_songs_batch
 from services.cache import redis_client_raw, cache_get, cache_set
 from spotipy.oauth2 import SpotifyOAuth, SpotifyClientCredentials
@@ -305,20 +305,26 @@ def get_collections():
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
     # Verify Redis configuration for Vercel
-    if not os.getenv('REDIS_URL') and os.getenv('VERCEL'):
+    if not os.getenv('REDIS_URL') and (os.getenv('VERCEL') == '1' or os.getenv('VERCEL_ENV')):
         logger.error("REDIS_URL is missing in Vercel environment! Sessions will be unstable.")
 
     try:
-        # Get a fresh token directly from the OAuth manager to pass to workers
+        # Get a fresh, VALIDATED token for background workers
         sp_oauth = create_spotify_oauth()
         token_info = sp_oauth.cache_handler.get_cached_token()
+        
+        # Refresh if needed before passing to workers
+        if token_info and sp_oauth.is_token_expired(token_info):
+            logger.info("Token expired for workers, refreshing...")
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            
         access_token = token_info.get('access_token') if token_info else None
 
         if not access_token:
-            logger.error("Failed to extract access token for background workers from session.")
+            logger.error("Failed to extract valid access token for background workers.")
             return jsonify({"error": "token_extraction_failed"}), 500
 
-        # Worker client with shorter timeout and SHARED SESSION for pool optimization
+        # Worker client with shared session
         sp_worker = spotipy.Spotify(
             auth=access_token, 
             requests_timeout=3,
@@ -339,7 +345,7 @@ def get_collections():
             liked_total = liked_res.get('total', 0)
         except: pass
 
-        # Reduce limit for speed, but keep it high enough to find user playlists
+        # Fetch playlists
         playlists_res = debug_spotify_request("current_user_playlists", sp, limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
 
@@ -360,33 +366,30 @@ def get_collections():
             is_owner = owner_id == user_id
             is_collaborative = p.get('collaborative', False)
 
-            # Initial count from simplified object
+            # 1. Primary Source: Initial count from simplified object
             tracks_info = p.get('tracks', {})
             total_tracks = 0
             if isinstance(tracks_info, dict):
-                # Use .get() carefully to handle None values
-                total_tracks = tracks_info.get('total') or 0
+                total_tracks = tracks_info.get('total', 0)
 
-            # SAFE FALLBACK: If total is 0, ALWAYS try a deep fetch via playlist()
+            # 2. Safety Fallback: Only if total is 0, try a deep fetch via playlist_items(limit=1)
+            # This is more efficient than fetching the full playlist object
             if total_tracks == 0:
-                # Targeted call for speed - using playlist()
                 try:
                     check = debug_spotify_request(
-                        "playlist",
-                        sp_worker,
+                        "playlist_items", 
+                        sp_worker, 
                         p_id, 
-                        debug_token_info=token_info # Pass token info as threads can't access session
+                        fields="total",
+                        limit=1,
+                        debug_token_info=token_info
                     )
-
                     if check and isinstance(check, dict):
-                        # DEEP LOG: See what the count actually is
-                        tracks_obj = check.get('tracks', {})
-                        total_tracks = tracks_obj.get('total') or 0
-                        logger.info(f"FALLBACK RESULT for {p_name}: Found {total_tracks} tracks (Raw keys: {list(check.keys())})")
+                        total_tracks = check.get('total', 0)
+                        if total_tracks > 0:
+                            logger.info(f"FALLBACK SUCCESS for {p_name}: {total_tracks} tracks found.")
                 except Exception as e:
-                    # Log only, don't crash the whole list
-                    status = getattr(e, 'http_status', 'UNKNOWN')
-                    logger.debug(f"Metadata fallback failed for {p_name} (Status: {status}): {e}")
+                    logger.debug(f"Metadata fallback failed for {p_name}: {e}")
 
             return {
                 "id": p_id,
@@ -398,11 +401,9 @@ def get_collections():
             }
 
         # Use ThreadPoolExecutor to process playlists in parallel
-        # Increased max_workers to 15 for better speed when multiple fallbacks are needed
         with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
             results = list(executor.map(process_playlist, items))
 
-        # Filter out None and sort to maintain original order if needed (map preserves order)
         playlists = [r for r in results if r is not None]
 
         return jsonify({
@@ -412,6 +413,7 @@ def get_collections():
     except Exception as e:
         logger.error(f"Collections fetch error: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 def clean_track_name(name: str) -> str:
     """Removes junk like (Remastered) or - Live from track names."""
