@@ -1,6 +1,7 @@
 <script>
 const btn = document.getElementById("mainBtn");
 const userTitle = document.getElementById("userTitle");
+const logoutBtn = document.getElementById("logoutBtn");
 
 // =======================
 // AUTH CHECK
@@ -13,11 +14,20 @@ async function checkAuth() {
 
         if (!data.authenticated) {
             btn.textContent = "[ LOGIN TO SPOTIFY ]";
+            if (logoutBtn) logoutBtn.style.display = 'none';
             btn.onclick = () => {
                 window.location.href = "/login";
             };
         } else {
             btn.textContent = "[ START ANALYSIS ]";
+            if (logoutBtn) {
+                logoutBtn.style.display = 'block';
+                logoutBtn.onclick = () => {
+                    if (confirm("Logout from Spotify session?")) {
+                        window.location.href = "/logout";
+                    }
+                };
+            }
             await setUserName();
             btn.onclick = () => {
                 startAnalysis();
