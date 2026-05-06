@@ -852,6 +852,25 @@ async function handleEvent(event, isReplay = false) {
             });
 
             messageContainer.appendChild(grid);
+            
+            // ADD COPY BUTTON FOR FINAL VERDICT
+            const finalMsgs = messageContainer.querySelectorAll('.message.profile .text-content');
+            const lastFinalMsg = finalMsgs[finalMsgs.length - 1];
+            if (lastFinalMsg) {
+                const copyBtn = document.createElement('div');
+                copyBtn.className = 'theme-toggle';
+                copyBtn.style.marginTop = '15px';
+                copyBtn.style.display = 'inline-block';
+                copyBtn.style.fontSize = '10px';
+                copyBtn.textContent = '[ COPY FINAL VERDICT ]';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(lastFinalMsg.textContent);
+                    copyBtn.textContent = '[ COPIED! ]';
+                    setTimeout(() => copyBtn.textContent = '[ COPY FINAL VERDICT ]', 2000);
+                };
+                messageContainer.appendChild(copyBtn);
+            }
+
             addMessage('system', '>> ANALYSIS_COMPLETE. HOVER OVER COVERS FOR INDIVIDUAL CRITIQUES.');
             break;
     }
