@@ -9,6 +9,9 @@ from flask_session import Session
 import redis
 import json
 
+from services.pipeline import run_pipeline_optimized
+from routes.auth import auth_bp
+
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
