@@ -331,6 +331,32 @@ def get_collections():
 
             p_id = p.get('id')
             p_name = p.get('name')
+            
+            # 1. Check initial count
+            tracks_info = p.get('tracks', {})
+            initial_count = 0
+            if isinstance(tracks_info, dict):
+                initial_count = tracks_info.get('total', 0) or 0
+            
+            total_tracks = initial_count
+            logger.info(f"[DIAGNOSTIC] Playlist: {p_name} | Initial Count: {initial_count}")
+
+            # 2. Safety Fallback: Trigger if initial is 0
+            if initial_count == 0:
+                try:
+                    # We'll try the items endpoint with limit 1 - it's often more reliable for counts
+                    check = debug_spotify_request(
+                        "playlist_items", 
+                        sp, 
+                        p_id, 
+                        limit=1,
+                        debug_token_info=token_info
+                    )
+                    if check and isinstance(check, dict):
+                        total_tracks = check.get('total', 0) or 0
+                        logger.info(f"[DIAGNOSTIC] Fallback Result for {p_name}: {total_tracks}")
+                except Exception as e:
+                    logger.debug(f"[DIAGNOSTIC] Fallback Failed for {p_name}: {e}")
 
             # Defensive image parsing
             image_url = ""
@@ -343,35 +369,6 @@ def get_collections():
             is_owner = owner_id == user_id
             is_collaborative = p.get('collaborative', False)
 
-            # 1. Primary Source: Initial count from simplified object
-            tracks_info = p.get('tracks', {})
-            total_tracks = 0
-            if isinstance(tracks_info, dict):
-                # Use .get() carefully; sometimes Spotify returns None for fields
-                total_tracks = tracks_info.get('total', 0) or 0
-
-            # 2. Safety Fallback: If total is 0, try a deep fetch via playlist() with fields
-            # We use the main 'sp' client here as it's thread-safe for reading with a static token
-            if total_tracks == 0:
-                try:
-                    # Requesting only the tracks.total field for speed
-                    check = debug_spotify_request(
-                        "playlist", 
-                        sp, 
-                        p_id, 
-                        fields="tracks.total",
-                        debug_token_info=token_info
-                    )
-                    if check and isinstance(check, dict):
-                        # Response structure for fields="tracks.total" is {"tracks": {"total": ...}}
-                        deep_tracks = check.get('tracks', {})
-                        if isinstance(deep_tracks, dict):
-                            total_tracks = deep_tracks.get('total', 0) or 0
-                            if total_tracks > 0:
-                                logger.info(f"FALLBACK SUCCESS for {p_name}: {total_tracks} tracks found.")
-                except Exception as e:
-                    logger.debug(f"Metadata fallback failed for {p_name}: {e}")
-
             return {
                 "id": p_id,
                 "name": p_name,
@@ -382,11 +379,14 @@ def get_collections():
             }
 
         # Use ThreadPoolExecutor to process playlists in parallel
-        # We use the existing 'sp' client which is already initialized with the token
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(process_playlist, items))
 
         playlists = [r for r in results if r is not None]
+        
+        # FINAL LOGGING OF THE WHOLE BATCH
+        summary = {p['name']: p['total'] for p in playlists}
+        logger.info(f"[DIAGNOSTIC] FINAL COLLECTION SUMMARY: {summary}")
 
         return jsonify({
             "liked_total": liked_total,
