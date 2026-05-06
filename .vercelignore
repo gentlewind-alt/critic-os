@@ -1,0 +1,26 @@
+# Vercel Deployment Ignore List
+# These files will not be uploaded to Vercel, keeping the build small.
+
+# Large Datasets (We use jokes_subset.csv now)
+cleaned_reddit_jokes.csv
+jokes_with_emotions.csv
+
+# Local Models & Notebooks
+mistral-4bit-local/
+main.ipynb
+
+# Development Scripts & Temporary Data
+test_groq_openai.py
+test_spotify_fetch.py
+top_10_songs.json
+lyrics.json
+lastfm_tags.txt
+README_FLASK.md
+stitch design/
+
+# Standard Ignores
+.git/
+.vscode/
+__pycache__/
+*.pyc
+.env
