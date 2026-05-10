@@ -35,24 +35,31 @@ def generate_ai_question(song: Dict, persona: str = "normal", history: List[str]
     track = song.get("track_name", "Unknown")
     artist = song.get("artist_name", "Unknown")
     emotions = ", ".join(song.get("Emotion", ["neutral"]))
-    lyrics = song.get("plain_lyrics", "")[:500]
+    
+    # Handle missing or instrumental lyrics gracefully
+    lyrics_raw = song.get("plain_lyrics") or ""
+    if not lyrics_raw.strip():
+        lyrics = "[INSTRUMENTAL / NO LYRICS FOUND]"
+    else:
+        lyrics = lyrics_raw[:500]
     
     history_str = "\n".join([f"- {h}" for h in history]) if history else "None"
     persona_prompt = QUESTION_PERSONA_PROMPTS.get(persona, QUESTION_PERSONA_PROMPTS["normal"])
 
     prompt = f"""{persona_prompt}
-Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyrics, ask ONE short question (max 15 words) to the user.
+Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyrics context, ask ONE short question (max 15 words) to the user.
 
 ### PREVIOUS INTERACTION CONTEXT
 {history_str}
 
-### LYRICS
+### LYRICS CONTEXT
 {lyrics}
 
 ### RULES
 1. DO NOT repeat themes from the previous interaction context.
 2. Provide two short options (A and B).
-3. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}}}
+3. If the lyrics are marked as [INSTRUMENTAL], ask a question about the lack of lyrics or the pure musical vibe.
+4. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}}}
 """
 
     try:

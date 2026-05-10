@@ -112,13 +112,17 @@ body.light-mode::before {
 
 .persona-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-top: 40px;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-top: 30px;
+    width: 90%;
+    max-width: 400px;
+    overflow-y: auto;
+    padding: 10px;
 }
 
 .persona-card {
-    padding: 20px;
+    padding: 15px;
     border: 1px solid var(--border-color);
     cursor: pointer;
     transition: all 0.3s;
@@ -132,14 +136,14 @@ body.light-mode::before {
 }
 
 .persona-card h3 {
-    margin: 0 0 10px 0;
-    font-size: 14px;
+    margin: 0 0 8px 0;
+    font-size: 13px;
     color: var(--accent-color);
 }
 
 .persona-card p {
     margin: 0;
-    font-size: 11px;
+    font-size: 10px;
     color: var(--dim-text);
 }
 
@@ -147,7 +151,7 @@ body.light-mode::before {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    padding: 20px;
+    padding: 15px;
     box-sizing: border-box;
     position: relative;
     z-index: 10;
@@ -166,10 +170,10 @@ body.light-mode::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 12px;
+    font-size: 11px;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+    padding-bottom: 8px;
+    margin-bottom: 15px;
 }
 
 .theme-toggle {
@@ -215,14 +219,16 @@ body.light-mode #activePersona, body.light-mode #sessId {
 /* MAIN CONTENT */
 .main-content {
     display: flex;
+    flex-direction: column;
     flex: 1;
-    gap: 20px;
-    overflow: hidden;
+    gap: 15px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* CHAT AREA */
 .chat-window {
-    flex: 2;
+    flex: none;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border-color);
@@ -230,25 +236,26 @@ body.light-mode #activePersona, body.light-mode #sessId {
     position: relative;
     overflow: hidden;
     transition: background 0.3s, border-color 0.3s;
+    min-height: 400px;
 }
 
 .messages {
     flex: 1;
-    padding: 20px;
+    padding: 15px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
 }
 
 .message {
-    max-width: 85%;
-    padding: 12px 16px;
+    max-width: 90%;
+    padding: 10px 14px;
     border-radius: 4px;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 13px;
+    line-height: 1.4;
     position: relative;
     word-wrap: break-word;
     overflow-wrap: break-word;
@@ -261,7 +268,7 @@ body.light-mode #activePersona, body.light-mode #sessId {
     background: transparent;
     border-left: 2px solid var(--dim-text);
     color: var(--dim-text);
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .message.ai {
@@ -271,19 +278,19 @@ body.light-mode #activePersona, body.light-mode #sessId {
     color: var(--text-color);
     animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
-    padding-left: 45px;
+    padding-left: 40px;
 }
 
 .message.ai::before {
     content: "AI";
     position: absolute;
-    left: 10px;
-    top: 12px;
-    width: 24px;
-    height: 24px;
+    left: 8px;
+    top: 10px;
+    width: 22px;
+    height: 22px;
     background: var(--accent-color);
     color: var(--bg-color);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: bold;
     display: flex;
     align-items: center;
@@ -298,16 +305,16 @@ body.light-mode #activePersona, body.light-mode #sessId {
     color: var(--text-color);
     animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
-    padding-left: 45px;
+    padding-left: 40px;
 }
 
 .message.profile::before {
     content: "";
     position: absolute;
-    left: 10px;
-    top: 12px;
-    width: 28px;
-    height: 28px;
+    left: 8px;
+    top: 10px;
+    width: 24px;
+    height: 24px;
     background-image: var(--msg-icon, url('https://placehold.co/28?text=U'));
     background-size: cover;
     background-position: center;
@@ -323,16 +330,16 @@ body.light-mode #activePersona, body.light-mode #sessId {
     border-left: 4px solid var(--accent-color);
     animation: slideInRoast 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
-    padding-left: 48px; /* Slightly increased for icon clearance */
+    padding-left: 42px;
 }
 
 .message.roast::before {
     content: "";
     position: absolute;
-    left: 10px;
-    top: 12px;
-    width: 28px;
-    height: 28px;
+    left: 8px;
+    top: 10px;
+    width: 24px;
+    height: 24px;
     background-image: var(--msg-icon, url('https://placehold.co/28'));
     background-size: cover;
     background-position: center;
@@ -357,8 +364,8 @@ body.light-mode .message.roast {
 
 .cursor {
     display: inline-block;
-    width: 8px;
-    height: 15px;
+    width: 6px;
+    height: 12px;
     background: var(--accent-color);
     margin-left: 4px;
     vertical-align: middle;
@@ -379,31 +386,32 @@ body.light-mode .message.roast {
 
 /* SIDEBAR / COVERFLOW */
 .sidebar {
-    flex: 1;
+    flex: none;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
+    padding-bottom: 20px;
 }
 
 .cover-display {
-    flex: 1;
     border: 1px solid var(--border-color);
     background: var(--card-bg);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 15px;
     position: relative;
     transition: background 0.3s, border-color 0.3s;
 }
 
 #activeCover {
-    width: 80%;
+    width: 60%;
+    max-width: 200px;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 8px;
-    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
     transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
     backface-visibility: hidden;
     will-change: transform, filter;
@@ -411,30 +419,33 @@ body.light-mode .message.roast {
 
 .song-info {
     text-align: center;
-    margin-top: 20px;
+    margin-top: 15px;
 }
 
-.song-info h3 { margin: 0; font-size: 18px; }
-.song-info p { margin: 5px 0; color: var(--dim-text); font-size: 14px; }
+.song-info h3 { margin: 0; font-size: 15px; }
+.song-info p { margin: 4px 0; color: var(--dim-text); font-size: 12px; }
 
 /* FOOTER */
 .footer {
-    height: 40px;
+    height: auto;
+    padding: 10px 0;
     display: flex;
+    flex-direction: column;
+    gap: 8px;
     align-items: center;
-    justify-content: space-between;
-    font-size: 10px;
+    justify-content: center;
+    font-size: 9px;
     color: var(--dim-text);
     border-top: 1px solid var(--border-color);
-    margin-top: 20px;
+    margin-top: 15px;
 }
 
 /* WATERMARK */
 .watermark {
     position: fixed;
-    top: 15px;
-    left: 20px;
-    font-size: 10px;
+    top: 10px;
+    left: 15px;
+    font-size: 9px;
     opacity: 0.3;
     z-index: 10000;
 }
@@ -457,34 +468,34 @@ body.light-mode .message.roast {
     position: fixed;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 80%;
+    width: 90%;
     max-width: 600px;
     background: var(--bg-color);
     border: 1px solid #ff9d00;
-    padding: 20px;
+    padding: 15px;
     z-index: 6000;
     display: none;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     box-shadow: 0 0 30px rgba(255, 157, 0, 0.2);
 }
 
 #tuneModal textarea {
     width: 100%;
-    height: 300px;
+    height: 200px;
     background: rgba(0,0,0,0.3);
     border: 1px solid var(--border-color);
     color: var(--text-color);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    padding: 10px;
+    font-size: 11px;
+    padding: 8px;
     resize: none;
 }
 
 #tuneModal .modal-btns {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
 }
 /* GLOBAL BACKGROUND */
 .global-bg {
@@ -511,10 +522,10 @@ body.light-mode .global-bg {
 /* ROASTCARD WINDOW */
 .roastcard-window {
     width: 100%;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     display: none; /* Hidden until roast starts */
@@ -523,18 +534,18 @@ body.light-mode .global-bg {
 }
 
 .roastcard-header {
-    height: 30px;
+    height: 25px;
     background: rgba(255,255,255,0.05);
     display: flex;
     align-items: center;
-    padding: 0 12px;
-    gap: 8px;
+    padding: 0 10px;
+    gap: 6px;
     border-bottom: 1px solid var(--border-color);
 }
 
 .roastcard-header .dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
 }
 
@@ -543,13 +554,13 @@ body.light-mode .global-bg {
 .roastcard-header .dot.maximize { background: #27c93f; }
 
 .roastcard-body {
-    padding: 30px;
-    font-size: 24px;
+    padding: 20px;
+    font-size: 18px;
     line-height: 1.4;
-    min-height: 150px;
+    min-height: 120px;
     color: var(--accent-color);
     position: relative;
-    transition: opacity 1.5s ease; /* Slowed down from 0.8s for smoother transition */
+    transition: opacity 1.5s ease;
 }
 
 .roastcard-body.fade-out {
@@ -557,38 +568,39 @@ body.light-mode .global-bg {
 }
 
 .roastcard-body .cursor {
-    width: 12px;
-    height: 24px;
+    width: 10px;
+    height: 18px;
 }
 
 /* QUESTION MODULE */
 .question-module {
-    margin-top: 20px;
-    padding-top: 20px;
+    margin-top: 15px;
+    padding-top: 15px;
     border-top: 1px solid var(--border-color);
     display: none;
     animation: fadeIn 0.5s ease;
 }
 
 .question-text {
-    font-size: 16px;
+    font-size: 14px;
     color: var(--accent-color);
-    margin-bottom: 15px;
+    margin-bottom: 12px;
     font-style: italic;
 }
 
 .question-options {
     display: flex;
-    gap: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .option-btn {
-    padding: 8px 20px;
+    padding: 6px 15px;
     border: 1px solid var(--accent-color);
     background: transparent;
     color: var(--accent-color);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -612,9 +624,9 @@ body.light-mode .global-bg {
 /* COLLECTIVE GRID */
 .collective-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 25px;
-    padding: 30px;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    padding: 15px;
     width: 100%;
     box-sizing: border-box;
     animation: slideIn 1s cubic-bezier(0.16, 1, 0.3, 1);
@@ -623,18 +635,18 @@ body.light-mode .global-bg {
 .grid-item {
     position: relative;
     aspect-ratio: 1;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
     background: #000;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
 }
 
 .grid-item:hover {
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 10px 30px rgba(0,255,65,0.2);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(0,255,65,0.2);
     border-color: var(--accent-color);
 }
 
@@ -642,18 +654,12 @@ body.light-mode .global-bg {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: filter 0.4s ease, transform 0.4s ease;
-}
-
-.grid-item:hover img {
-    filter: brightness(0.5) blur(4px);
-    transform: scale(1.1);
 }
 
 .grid-overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    padding: 20px;
+    padding: 12px;
     box-sizing: border-box;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -663,7 +669,7 @@ body.light-mode .global-bg {
     align-items: center;
     text-align: center;
     z-index: 2;
-    background: rgba(255, 252, 240, 0.95); /* Warm White Background */
+    background: rgba(255, 252, 240, 0.95);
 }
 
 .grid-item:hover .grid-overlay {
@@ -671,18 +677,18 @@ body.light-mode .global-bg {
 }
 
 .grid-overlay h4 {
-    font-size: 14px;
-    margin: 0 0 8px 0;
-    color: #1a1a1a; /* Darker text for contrast */
+    font-size: 11px;
+    margin: 0 0 4px 0;
+    color: #1a1a1a;
     text-transform: uppercase;
     letter-spacing: 1px;
     font-weight: 600;
 }
 
 .grid-overlay p {
-    font-size: 12px;
-    line-height: 1.4;
-    color: #333; /* Darker text for contrast */
+    font-size: 10px;
+    line-height: 1.3;
+    color: #333;
     margin: 0;
     font-family: 'Inter', sans-serif;
 }
@@ -690,39 +696,41 @@ body.light-mode .global-bg {
 /* PROFILE CARD */
 .profile-card {
     width: 100%;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     background: var(--card-bg);
     border: 1px solid var(--accent-color);
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 0 30px rgba(0, 255, 65, 0.15);
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.15);
     display: none;
     flex-direction: column;
     animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .profile-card-header {
-    height: 35px;
+    height: 30px;
     background: rgba(0, 255, 65, 0.1);
     display: flex;
     align-items: center;
-    padding: 0 15px;
+    padding: 0 12px;
     border-bottom: 1px solid var(--accent-color);
-    font-size: 12px;
+    font-size: 10px;
     color: var(--accent-color);
     letter-spacing: 1px;
 }
 
 .profile-card-body {
-    padding: 30px;
+    padding: 20px;
     display: flex;
-    gap: 25px;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+    text-align: center;
 }
 
 .profile-avatar {
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     border: 2px solid var(--accent-color);
     object-fit: cover;
@@ -730,24 +738,26 @@ body.light-mode .global-bg {
 
 .profile-text-content {
     flex: 1;
-    font-size: 18px;
+    font-size: 14px;
     line-height: 1.5;
     color: var(--text-color);
 }
 
 .profile-interaction {
-    margin-top: 20px;
+    margin-top: 15px;
     display: none;
-    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
 }
 
 .profile-btn {
-    padding: 8px 20px;
+    padding: 6px 15px;
     border: 1px solid var(--accent-color);
     background: transparent;
     color: var(--accent-color);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -755,6 +765,173 @@ body.light-mode .global-bg {
 .profile-btn:hover {
     background: var(--accent-color);
     color: var(--bg-color);
+}
+
+/* DESKTOP ENHANCEMENTS */
+@media (min-width: 768px) {
+    .persona-grid {
+        grid-template-columns: repeat(3, 1fr);
+        width: auto;
+        max-width: none;
+        overflow-y: visible;
+        gap: 20px;
+    }
+
+    .persona-card h3 {
+        font-size: 14px;
+    }
+
+    .persona-card p {
+        font-size: 11px;
+    }
+
+    .app-container {
+        padding: 20px;
+    }
+
+    .header {
+        font-size: 12px;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+
+    .main-content {
+        flex-direction: row;
+        gap: 20px;
+        overflow: hidden;
+    }
+
+    .chat-window {
+        flex: 2;
+        min-height: 0;
+    }
+
+    .messages {
+        padding: 20px;
+        gap: 15px;
+    }
+
+    .message {
+        max-width: 85%;
+        font-size: 14px;
+    }
+
+    .message.system {
+        font-size: 12px;
+    }
+
+    .message.ai, .message.profile {
+        padding-left: 45px;
+    }
+
+    .message.ai::before {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+
+    .message.profile::before {
+        width: 28px;
+        height: 28px;
+    }
+
+    .message.roast {
+        padding-left: 48px;
+    }
+
+    .message.roast::before {
+        width: 28px;
+        height: 28px;
+    }
+
+    .cursor {
+        width: 8px;
+        height: 15px;
+    }
+
+    .sidebar {
+        flex: 1;
+        padding-bottom: 0;
+    }
+
+    #activeCover {
+        width: 80%;
+        max-width: none;
+    }
+
+    .song-info h3 { font-size: 18px; }
+    .song-info p { font-size: 14px; }
+
+    .footer {
+        flex-direction: row;
+        justify-content: space-between;
+        font-size: 10px;
+        margin-top: 20px;
+    }
+
+    .watermark {
+        top: 15px;
+        left: 20px;
+        font-size: 10px;
+    }
+
+    #tuneModal textarea {
+        height: 300px;
+        font-size: 12px;
+    }
+
+    .roastcard-body {
+        font-size: 24px;
+    }
+
+    .roastcard-body .cursor {
+        width: 12px;
+        height: 24px;
+    }
+
+    .question-text {
+        font-size: 16px;
+    }
+
+    .option-btn {
+        font-size: 12px;
+    }
+
+    .collective-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 25px;
+        padding: 30px;
+    }
+
+    .grid-overlay h4 {
+        font-size: 14px;
+    }
+
+    .grid-overlay p {
+        font-size: 12px;
+    }
+
+    .profile-card-body {
+        flex-direction: row;
+        text-align: left;
+    }
+
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+    }
+
+    .profile-text-content {
+        font-size: 18px;
+    }
+
+    .profile-interaction {
+        justify-content: flex-start;
+    }
+
+    .profile-btn {
+        font-size: 12px;
+    }
 }
 
 </style>

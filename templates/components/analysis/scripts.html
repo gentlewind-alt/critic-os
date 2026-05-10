@@ -731,15 +731,19 @@ async function handleEvent(event, isReplay = false) {
                 qModule.dataset.phrase = event.question_module.phrase;
                 qModule.dataset.songIndex = event.index;
                 
-                // Enable buttons
-                document.getElementById('optionA').disabled = false;
-                document.getElementById('optionB').disabled = false;
+                // Keep buttons disabled initially (wait for typing to finish)
+                document.getElementById('optionA').disabled = true;
+                document.getElementById('optionB').disabled = true;
             } else {
                 qModule.style.display = 'none';
             }
             
             currentTokenQueue = new TokenQueue(displayContent, () => {
-                // Optional callback when done typing
+                // Enable buttons when done typing the roast/question
+                if (event.question_module && !isReplay) {
+                    document.getElementById('optionA').disabled = false;
+                    document.getElementById('optionB').disabled = false;
+                }
             });
             break;
 

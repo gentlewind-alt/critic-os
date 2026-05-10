@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 groq_client = Groq(
     api_key=os.getenv("GROQ_API_KEY"),
 )
-GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"#"llama-3.3-70b-versatile"
+GROQ_MODEL = "llama-3.3-70b-versatile"#"meta-llama/llama-4-scout-17b-16e-instruct"
 
 # ==========================
 # JOKES DATASET LOADING
@@ -100,7 +100,10 @@ PERSONAS = {
 def build_prompt(song: Dict, persona: str = "normal", custom_prompt: str = None, interaction_state: str = None) -> str:
     track = song.get("track_name", "Unknown Track")
     artist = song.get("artist_name", "Unknown Artist")
-    lyrics = song.get("plain_lyrics", "")[:1000]
+    
+    # Handle missing or instrumental lyrics gracefully
+    lyrics_raw = song.get("plain_lyrics") or ""
+    lyrics = lyrics_raw[:1000]
     lyrics_found = song.get("lyrics_found", bool(lyrics))
 
     # Metadata for better context
@@ -126,7 +129,7 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
     if custom_prompt:
         base_instructions = custom_prompt
     elif not lyrics_found:
-        base_instructions = f"The lyrics for this song are missing. Sardonically roast the user for listening to such an obscure or untraceable track. Use SIMPLE English. MAXIMUM 40 WORDS."
+        base_instructions = f"The lyrics for this song are missing (it might be an instrumental track). Sardonically roast the user for listening to such an obscure or wordless track. Use SIMPLE English. MAXIMUM 40 WORDS."
     else:
         base_instructions = """Analyze the user's vibe based on this song. 
         CRITICAL RULES:

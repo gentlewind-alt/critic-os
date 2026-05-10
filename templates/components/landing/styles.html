@@ -118,23 +118,23 @@ body.light-mode::before {
 
 .hero {
     max-width: 800px;
-    padding: 40px;
+    padding: 20px;
 }
 
 .hero small {
-    font-size: 12px;
+    font-size: 10px;
     color: var(--accent-color);
     letter-spacing: 2px;
 }
 
 .hero h1 {
-    font-size: 64px;
-    margin: 20px 0 0;
+    font-size: 32px;
+    margin: 15px 0 0;
     color: var(--text-color);
 }
 
 .hero h2 {
-    font-size: 64px;
+    font-size: 32px;
     font-style: italic;
     font-weight: 300;
     margin: 0;
@@ -142,28 +142,31 @@ body.light-mode::before {
 }
 
 .hero p {
-    margin-top: 30px;
-    font-size: 14px;
+    margin-top: 20px;
+    font-size: 13px;
     color: var(--dim-text);
-    line-height: 1.6;
+    line-height: 1.5;
 }
 
 /* BUTTONS */
 .buttons {
-    margin-top: 40px;
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
 .btn {
     display: inline-block;
-    padding: 16px 32px;
+    padding: 14px 24px;
     border: 1px solid var(--accent-color);
     color: var(--accent-color);
     background: transparent;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
     transition: all 0.3s;
     text-transform: uppercase;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     position: relative;
     overflow: hidden;
 }
@@ -181,11 +184,14 @@ body.light-mode::before {
 
 /* FOOTER */
 .footer {
-    height: 40px;
+    height: auto;
+    padding: 15px 0;
     display: flex;
+    flex-direction: column;
+    gap: 10px;
     align-items: center;
-    justify-content: space-between;
-    font-size: 10px;
+    justify-content: center;
+    font-size: 9px;
     color: var(--dim-text);
     border-top: 1px solid var(--border-color);
     margin-top: 20px;
@@ -194,9 +200,9 @@ body.light-mode::before {
 /* WATERMARK */
 .watermark {
     position: fixed;
-    top: 15px;
-    left: 20px;
-    font-size: 10px;
+    top: 10px;
+    left: 10px;
+    font-size: 9px;
     opacity: 0.3;
     z-index: 10000;
 }
@@ -239,18 +245,18 @@ body.light-mode .global-bg {
 }
 
 .collection-window {
-    width: 90%;
+    width: 95%;
     max-width: 600px;
     background: var(--bg-color);
     border: 1px solid var(--accent-color);
     box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
     display: flex;
     flex-direction: column;
-    max-height: 80vh;
+    max-height: 90vh;
 }
 
 .collection-header {
-    padding: 15px;
+    padding: 12px;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
@@ -263,7 +269,7 @@ body.light-mode .global-bg {
     border: none;
     color: var(--dim-text);
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .close-btn:hover {
@@ -273,15 +279,15 @@ body.light-mode .global-bg {
 .collection-list {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 15px;
 }
 
 .collection-item {
     display: flex;
     align-items: center;
-    padding: 15px;
+    padding: 12px;
     border: 1px solid var(--border-color);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -289,35 +295,75 @@ body.light-mode .global-bg {
 .collection-item:hover {
     border-color: var(--accent-color);
     background: rgba(0, 255, 65, 0.05);
-    transform: translateX(10px);
 }
 
 .collection-img {
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
     background: #111;
-    margin-right: 15px;
+    margin-right: 12px;
     border: 1px solid var(--border-color);
     object-fit: cover;
 }
 
 .collection-info h4 {
     margin: 0;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-color);
 }
 
 .collection-info p {
-    margin: 5px 0 0;
-    font-size: 10px;
+    margin: 4px 0 0;
+    font-size: 9px;
     color: var(--dim-text);
 }
 
 .loading-text {
     text-align: center;
     color: var(--accent-color);
-    padding: 40px;
-    font-size: 12px;
+    padding: 30px;
+    font-size: 11px;
+}
+
+/* DESKTOP ENHANCEMENTS */
+@media (min-width: 768px) {
+    .app-container {
+        padding: 40px;
+    }
+
+    .hero {
+        padding: 40px;
+    }
+
+    .hero h1, .hero h2 {
+        font-size: 64px;
+    }
+
+    .hero p {
+        font-size: 14px;
+        margin-top: 30px;
+    }
+
+    .buttons {
+        flex-direction: row;
+        justify-content: center;
+        gap: 20px;
+    }
+
+    .btn {
+        padding: 16px 32px;
+        font-size: 14px;
+    }
+
+    .footer {
+        flex-direction: row;
+        justify-content: space-between;
+        font-size: 10px;
+    }
+
+    .collection-item:hover {
+        transform: translateX(10px);
+    }
 }
 
 </style>

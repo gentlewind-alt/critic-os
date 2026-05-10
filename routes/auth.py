@@ -382,7 +382,8 @@ def get_collections():
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(process_playlist, items))
 
-        playlists = [r for r in results if r is not None]
+        # Filter out None results and playlists with 0 tracks
+        playlists = [r for r in results if r is not None and r.get('total', 0) > 0]
         
         # FINAL LOGGING OF THE WHOLE BATCH
         summary = {p['name']: p['total'] for p in playlists}
