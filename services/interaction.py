@@ -120,10 +120,10 @@ def map_answer_to_state(choice: str, question_data: Dict) -> str:
     """Converts a choice into a descriptive string for the AI roast context."""
     question = question_data.get("question", "")
     option_text = question_data.get("options", {}).get(choice, "Unknown")
-    return f"User was asked '{question}' and answered '{option_text}'"
+    return f"confirmed they chose '{option_text}' when asked '{question}'"
 
 def map_profile_answer_to_state(choice: str, question_data: Dict) -> str:
     """Convert user profile response into a grounded state."""
     question = question_data.get("question", "")
     option_text = question_data.get("options", {}).get(choice, "Unknown")
-    return f"In their profile overview, user was asked '{question}' and admitted: '{option_text}'"
+    return f"admitted that '{option_text}' when asked '{question}' in their profile overview"

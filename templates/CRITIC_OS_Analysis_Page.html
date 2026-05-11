@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRITIC_OS | SESSION ACTIVE</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;500&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.14/dist/dotlottie-wc.js" type="module"></script>
 {% include 'components/analysis/styles.html' %}
 </head>
 <body>
@@ -14,6 +15,13 @@
 {% include 'components/analysis/background.html' %}
 {% include 'components/analysis/modals.html' %}
 {% include 'components/analysis/persona_overlay.html' %}
+
+<div id="transitionOverlay">
+    <div class="hourglass-container" style="width: 300px;">
+        <dotlottie-wc src="https://lottie.host/b8a78486-d9f5-498e-89eb-ec41637c5dc3/fHUpxUfE4r.lottie" autoplay loop></dotlottie-wc>
+    </div>
+    <div class="transition-status" id="transitionStatus">INITIALIZING CORE...</div>
+</div>
 
 <div class="app-container" id="appContainer">
     {% include 'components/analysis/header.html' %}

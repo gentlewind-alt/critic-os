@@ -194,6 +194,30 @@ function showPersonaSelection() {
     generateGlobalBackground();
 }
 
+const transitionOverlay = document.getElementById('transitionOverlay');
+const transitionStatus = document.getElementById('transitionStatus');
+
+let transitionInterval = null;
+const transitionMessages = [
+    "ANALYZING BEHAVIORAL PATTERNS...",
+    "SCANNING ALBUM DATA...",
+    "DEBUNKING MAIN CHARACTER SYNDROME...",
+    "CORRELATING SADNESS LEVELS...",
+    "ISOLATING TIKTOK TRENDS...",
+    "PREPARING BRUTAL HONESTY..."
+];
+
+function cycleStatus() {
+    let i = 0;
+    if (transitionStatus) {
+        transitionStatus.textContent = transitionMessages[i];
+        transitionInterval = setInterval(() => {
+            i = (i + 1) % transitionMessages.length;
+            transitionStatus.textContent = transitionMessages[i];
+        }, 2500);
+    }
+}
+
 function selectPersona(persona) {
     selectedPersona = persona;
     activePersonaLabel.textContent = persona.toUpperCase();
@@ -201,6 +225,13 @@ function selectPersona(persona) {
     personaOverlay.style.opacity = '0';
     setTimeout(() => {
         personaOverlay.style.display = 'none';
+        
+        // SHOW TRANSITION
+        if (transitionOverlay) {
+            transitionOverlay.style.display = 'flex';
+            cycleStatus();
+        }
+        
         appContainer.classList.add('ready');
         startStreaming();
     }, 800);
@@ -369,7 +400,7 @@ async function handleProfileResponse(choice) {
     pInteraction.style.display = 'none';
     pOutput.textContent = '>> RE-GROUNDING AI_CORE_LOGIC...';
     
-    const state = `was asked "${qText}" and answered: "${optionText}"`;
+    const state = `admitted that '${optionText}' when asked '${qText}' in their profile overview`;
     
     try {
         const response = await fetch('/stream-profile-answer', {
@@ -444,7 +475,7 @@ async function submitAnswer(choice) {
     displayContent.textContent = '>> RE-GROUNDING AI_CORE_LOGIC...';
     
     // Map choice to state accurately
-    const state = `User was asked: "${qText}" and answered: "${optionText}"`;
+    const state = `confirmed they chose '${optionText}' when asked '${qText}'`;
     
     try {
         const response = await fetch('/stream-answer', {
@@ -510,13 +541,9 @@ async function submitAnswer(choice) {
 }
 
 async function startStreaming() {
-    const colName = sessionStorage.getItem('os_collection_name') || 'your collection';
-    addMessage('system', `>> INITIATING COMPREHENSIVE PROFILE CRITIQUE FOR [${colName.toUpperCase()}] (${selectedPersona.toUpperCase()} MODE)...`);
-    const coreMsg = addMessage('system', '>> CONNECTING TO AI_CORE_MODULE...');
-    coreMsg.id = 'coreStatusMsg';
-    
     const customPrompt = sessionStorage.getItem('os_custom_prompt');
     const profileCustomPrompt = sessionStorage.getItem('os_profile_custom_prompt');
+    const colName = sessionStorage.getItem('os_collection_name') || 'your collection';
     
     try {
         const response = await fetch('/stream/123', {
@@ -602,6 +629,17 @@ async function startStreaming() {
 
 async function handleEvent(event, isReplay = false) {
     console.log("OS_EVENT_INBOUND:", event);
+    
+    // HIDE TRANSITION ON FIRST DATA
+    if (!isReplay && transitionOverlay && transitionOverlay.style.display !== 'none') {
+        if (['profile_start', 'roast_start'].includes(event.type)) {
+            transitionOverlay.style.opacity = '0';
+            setTimeout(() => {
+                transitionOverlay.style.display = 'none';
+                if (transitionInterval) clearInterval(transitionInterval);
+            }, 500);
+        }
+    }
     
     switch (event.type) {
         case 'log':
@@ -810,7 +848,8 @@ async function handleEvent(event, isReplay = false) {
             if (finalRoastCard) finalRoastCard.style.display = 'none';
 
             // Start final message
-            const finalMsg = addMessage('profile', '');
+            const finalUserImg = sessionStorage.getItem('userImage');
+            const finalMsg = addMessage('profile', '', false, finalUserImg);
             const finalContent = finalMsg.querySelector('.text-content');
             currentTokenQueue = new TokenQueue(finalContent);
             
@@ -884,8 +923,22 @@ function addMessage(type, text, instant = false, icon = null) {
     const msg = document.createElement('div');
     msg.className = `message ${type}`;
     
-    if (icon) {
-        msg.style.setProperty('--msg-icon', `url('${icon}')`);
+    // Determine icon
+    let finalIcon = icon;
+    if (type === 'profile' && !finalIcon) {
+        finalIcon = sessionStorage.getItem('userImage');
+    }
+    
+    // High-quality fallback for user profile
+    const fallbackUser = 'https://placehold.co/100/00ff41/000000?text=U';
+    const fallbackRoast = 'https://placehold.co/100/00ff41/000000?text=S';
+
+    if (type === 'profile') {
+        const iconUrl = (finalIcon && finalIcon !== 'null' && finalIcon !== 'undefined') ? finalIcon : fallbackUser;
+        msg.style.setProperty('--msg-icon', `url('${iconUrl}')`);
+    } else if (type === 'roast') {
+        const iconUrl = (finalIcon && finalIcon !== 'null' && finalIcon !== 'undefined') ? finalIcon : fallbackRoast;
+        msg.style.setProperty('--msg-icon', `url('${iconUrl}')`);
     }
     
     if (type === 'roast' || type === 'ai' || type === 'profile') {

@@ -106,7 +106,7 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
     # unless we use a request/response pattern. For now, we simulate the state
     # if the UI provides it, or generate the roast based on the question asked.
     
-    interaction_state = f"Persona asked: '{profile_q_module.get('question')}'"
+    interaction_state = f"was just asked '{profile_q_module.get('question')}'"
 
     try:
         from services.roast import generate_profile_roast_stream
@@ -176,7 +176,7 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
             }
             
             generator = generate_roast_stream(song, persona, custom_prompt, current_context)
-            session_history.append(f"Discussed {song.get('track_name')}: asked '{q_data.get('question')}'")
+            session_history.append(f"Previously analyzed {song.get('track_name')} and asked '{q_data.get('question')}'")
         else:
             # ROAST WITHOUT QUESTION
             yield {

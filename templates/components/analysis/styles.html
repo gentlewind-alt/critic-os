@@ -100,7 +100,8 @@ body.light-mode::before {
 /* PERSONA SELECTION */
 #personaOverlay {
     position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
+    top: 0; left: 0; 
+    width: 100vw; height: 100vh;
     background: var(--bg-color);
     z-index: 4500;
     display: none;
@@ -114,11 +115,8 @@ body.light-mode::before {
     display: grid;
     grid-template-columns: 1fr;
     gap: 15px;
-    margin-top: 30px;
     width: 90%;
     max-width: 400px;
-    overflow-y: auto;
-    padding: 10px;
 }
 
 .persona-card {
@@ -127,6 +125,7 @@ body.light-mode::before {
     cursor: pointer;
     transition: all 0.3s;
     text-align: center;
+    background: var(--card-bg);
 }
 
 .persona-card:hover {
@@ -147,11 +146,41 @@ body.light-mode::before {
     color: var(--dim-text);
 }
 
+/* TRANSITION OVERLAY */
+#transitionOverlay {
+    position: fixed;
+    top: 0; left: 0; 
+    width: 100vw; height: 100vh;
+    background: var(--bg-color);
+    z-index: 4600;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: opacity 0.5s ease;
+}
+
+.hourglass-container {
+    width: 300px;
+}
+
+.transition-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--accent-color);
+    max-width: 300px;
+    height: 20px;
+}
+
 .app-container {
     display: flex;
     flex-direction: column;
+    width: 95%;
+    max-width: 1200px;
     height: 100vh;
-    padding: 15px;
+    padding: 20px;
+    margin: 0 auto;
     box-sizing: border-box;
     position: relative;
     z-index: 10;
