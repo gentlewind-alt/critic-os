@@ -188,8 +188,9 @@ def callback():
     # check_cache=False ensures we exchange the NEW code instead of trying 
     # to refresh an old/invalid token that might be in Redis.
     try:
-        sp_oauth.get_access_token(code, check_cache=False)
-        logger.info("Successfully acquired new access token.")
+        token_info = sp_oauth.get_access_token(code, check_cache=False)
+        granted_scopes = token_info.get("scope", "N/A")
+        logger.info(f"[DIAGNOSTIC] Successfully acquired new access token. GRANTED_SCOPES: {granted_scopes}")
     except Exception as e:
         logger.error(f"Failed to get access token: {e}")
         return f"Authentication Error: {str(e)}. Please check your SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET.", 500
@@ -317,7 +318,11 @@ def get_collections():
                 "message": "You've already performed your one-time analysis. Come back in your next life."
             }), 403
 
-        # Get token info for logging purposes in debug_spotify_request
+        # Get token info for logging granted scopes
+        sp_oauth = create_spotify_oauth()
+        token_info = sp_oauth.cache_handler.get_cached_token()
+        granted_scopes = token_info.get("scope", "N/A") if token_info else "NONE"
+        logger.info(f"[DIAGNOSTIC] Current user: {user_id} | Scopes: {granted_scopes}")
 
         liked_total = 0
         try:
@@ -328,6 +333,11 @@ def get_collections():
         # Fetch playlists
         playlists_res = debug_spotify_request("current_user_playlists", sp, limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
+        
+        # DEEP DIAGNOSTIC: Log the first 3 playlists raw
+        if items:
+            for i in range(min(3, len(items))):
+                logger.info(f"[DIAGNOSTIC] RAW PLAYLIST {i} DATA: {str(items[i])[:500]}")
 
         def process_playlist(p):
             if not p: return None

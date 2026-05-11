@@ -851,6 +851,7 @@ async function handleEvent(event, isReplay = false) {
         case 'final_start':
             isCompleted = true;
             messageContainer.classList.remove('roasting-active');
+            lastDossierData = event.dossier; // Capture dossier data
             
             const finalRoastCard = document.getElementById('roastCard');
             if (finalRoastCard) finalRoastCard.style.display = 'none';
@@ -884,46 +885,81 @@ async function handleEvent(event, isReplay = false) {
                 currentTokenQueue = null;
             }
 
-            // RENDER THE GRID
-            const grid = document.createElement('div');
-            grid.className = 'collective-grid';
-            
-            completedRoasts.forEach(item => {
-                if (!item) return;
-                const gridItem = document.createElement('div');
-                gridItem.className = 'grid-item';
-                gridItem.innerHTML = `
-                    <img src="${item.image}" alt="${item.track}">
-                    <div class="grid-overlay">
-                        <h4>${item.track}</h4>
-                        <p>${item.roast}</p>
-                    </div>
-                `;
-                grid.appendChild(gridItem);
-            });
-
-            messageContainer.appendChild(grid);
-            
-            // ADD COPY BUTTON FOR FINAL VERDICT
-            const finalMsgs = messageContainer.querySelectorAll('.message.profile .text-content');
-            const lastFinalMsg = finalMsgs[finalMsgs.length - 1];
-            if (lastFinalMsg) {
-                const copyBtn = document.createElement('div');
-                copyBtn.className = 'theme-toggle';
-                copyBtn.style.marginTop = '15px';
-                copyBtn.style.display = 'inline-block';
-                copyBtn.style.fontSize = '10px';
-                copyBtn.textContent = '[ COPY FINAL VERDICT ]';
-                copyBtn.onclick = () => {
-                    navigator.clipboard.writeText(lastFinalMsg.textContent);
-                    copyBtn.textContent = '[ COPIED! ]';
-                    setTimeout(() => copyBtn.textContent = '[ COPY FINAL VERDICT ]', 2000);
-                };
-                messageContainer.appendChild(copyBtn);
+            // SHOW SHARE BUTTON
+            const shareBtn = document.getElementById('shareBtn');
+            if (shareBtn) {
+                shareBtn.style.display = 'block';
+                // Trigger transition to dossier
+                setTimeout(() => {
+                    const finalVerdict = messageContainer.querySelector('.message.profile:last-child .text-content').textContent;
+                    renderDossier(finalVerdict);
+                    toggleDossier(true);
+                }, 3000);
             }
 
-            addMessage('system', '>> ANALYSIS_COMPLETE. HOVER OVER COVERS FOR INDIVIDUAL CRITIQUES.');
+            addMessage('system', '>> ANALYSIS_COMPLETE. DOSSIER GENERATED.');
             break;
+    }
+}
+
+function renderDossier(verdict) {
+    if (!lastDossierData) return;
+
+    const dossierAvatar = document.getElementById('dossierAvatar');
+    const dossierName = document.getElementById('dossierName');
+    const dossierArchetype = document.getElementById('dossierArchetype');
+    const dossierStats = document.getElementById('dossierStats');
+    const dossierVerdict = document.getElementById('dossierVerdict');
+    const dossierGallery = document.getElementById('dossierGallery');
+
+    // Set User Info
+    dossierAvatar.src = sessionStorage.getItem('userImage') || 'https://placehold.co/80';
+    dossierName.textContent = (sessionStorage.getItem('userName') || 'USER_NULL').toUpperCase();
+
+    // Set AI Archetype
+    dossierArchetype.textContent = lastDossierData.archetype.toUpperCase();
+    
+    // Set Stats
+    dossierStats.innerHTML = '';
+    for (const [label, value] of Object.entries(lastDossierData.stats)) {
+        dossierStats.innerHTML += `
+            <div class="stat-item">
+                <div class="stat-label">${label}</div>
+                <div class="stat-value">${value}</div>
+            </div>
+        `;
+    }
+
+    // Set Verdict
+    dossierVerdict.textContent = verdict;
+
+    // Build Gallery
+    dossierGallery.innerHTML = '';
+    completedRoasts.forEach(song => {
+        if (!song) return;
+        const item = document.createElement('div');
+        item.className = 'dossier-item';
+        item.innerHTML = `
+            <img src="${song.image}" alt="${song.track}">
+            <div class="dossier-item-overlay">
+                <p><strong>${song.track.toUpperCase()}</strong></p>
+                <p style="margin-top:5px; font-size: 7px; opacity: 0.8;">${song.roast}</p>
+            </div>
+        `;
+        dossierGallery.appendChild(item);
+    });
+}
+
+function toggleDossier(forceOpen = null) {
+    const overlay = document.getElementById('dossierOverlay');
+    if (forceOpen === true) {
+        overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+    } else if (forceOpen === false) {
+        overlay.style.display = 'none';
+    } else {
+        const isHidden = getComputedStyle(overlay).display === 'none';
+        overlay.style.display = isHidden ? 'flex' : 'none';
     }
 }
 
