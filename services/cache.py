@@ -2,6 +2,7 @@ import os
 import redis
 import json
 import logging
+from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
