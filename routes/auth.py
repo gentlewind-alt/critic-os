@@ -339,8 +339,9 @@ def get_collections():
             for i in range(min(3, len(items))):
                 logger.info(f"[DIAGNOSTIC] RAW PLAYLIST {i} DATA: {str(items[i])[:500]}")
 
-        def process_playlist(p):
-            if not p: return None
+        playlists = []
+        for p in items:
+            if not p: continue
 
             p_id = p.get('id')
             p_name = p.get('name')
@@ -352,51 +353,47 @@ def get_collections():
                 initial_count = tracks_info.get('total', 0) or 0
             
             total_tracks = initial_count
-            logger.info(f"[DIAGNOSTIC] Playlist: {p_name} | Initial Count: {initial_count}")
+            logger.info(f"[DIAGNOSTIC] Processing {p_name} (ID: {p_id}) | Initial: {initial_count}")
 
             # 2. Safety Fallback: Trigger if initial is 0
+            # On Vercel/Production, the summary often returns 0 even if full.
             if initial_count == 0:
                 try:
-                    # We'll try the items endpoint with limit 1 - it's often more reliable for counts
+                    logger.info(f"[DIAGNOSTIC] Running fallback count check for {p_name}...")
+                    # Limit 1 is enough to get the 'total' field from the items endpoint
                     check = debug_spotify_request(
                         "playlist_items", 
                         sp, 
                         p_id, 
-                        limit=1,
-                        debug_token_info=token_info
+                        limit=1
                     )
                     if check and isinstance(check, dict):
                         total_tracks = check.get('total', 0) or 0
-                        logger.info(f"[DIAGNOSTIC] Fallback Result for {p_name}: {total_tracks}")
+                        logger.info(f"[DIAGNOSTIC] Fallback SUCCESS for {p_name}: {total_tracks} tracks found.")
                 except Exception as e:
-                    logger.debug(f"[DIAGNOSTIC] Fallback Failed for {p_name}: {e}")
+                    logger.error(f"[DIAGNOSTIC] Fallback FAILED for {p_name}: {e}")
 
-            # Defensive image parsing
-            image_url = ""
-            if p.get('images') and len(p.get('images')) > 0:
-                img = p.get('images')[0]
-                if isinstance(img, dict) and img.get('url'):
-                    image_url = img.get('url')
+            # Only include playlists that actually have tracks
+            if total_tracks > 0:
+                # Defensive image parsing
+                image_url = ""
+                if p.get('images') and len(p.get('images')) > 0:
+                    img = p.get('images')[0]
+                    if isinstance(img, dict) and img.get('url'):
+                        image_url = img.get('url')
 
-            owner_id = p.get('owner', {}).get('id')
-            is_owner = owner_id == user_id
-            is_collaborative = p.get('collaborative', False)
+                owner_id = p.get('owner', {}).get('id')
+                is_owner = owner_id == user_id
+                is_collaborative = p.get('collaborative', False)
 
-            return {
-                "id": p_id,
-                "name": p_name,
-                "image": image_url,
-                "total": total_tracks,
-                "is_owner": is_owner,
-                "is_collaborative": is_collaborative
-            }
-
-        # Use ThreadPoolExecutor to process playlists in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            results = list(executor.map(process_playlist, items))
-
-        # Filter out None results and playlists with 0 tracks
-        playlists = [r for r in results if r is not None and r.get('total', 0) > 0]
+                playlists.append({
+                    "id": p_id,
+                    "name": p_name,
+                    "image": image_url,
+                    "total": total_tracks,
+                    "is_owner": is_owner,
+                    "is_collaborative": is_collaborative
+                })
         
         # FINAL LOGGING OF THE WHOLE BATCH
         summary = {p['name']: p['total'] for p in playlists}

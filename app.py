@@ -126,5 +126,39 @@ def stream_profile_answer():
 
     return Response(event_stream(), mimetype="text/event-stream")
 
+@app.route("/save-report", methods=["POST"])
+def save_report():
+    from flask import session
+    from services.cache import save_user_report
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({"error": "No user ID"}), 401
+    
+    report_data = request.json
+    save_user_report(user_id, report_data)
+    return jsonify({"status": "success"})
+
+@app.route("/dossier")
+def dossier_page():
+    from flask import session
+    from services.cache import get_user_report
+    user_id = session.get('user_id')
+    
+    # Optional: fetch user info for fallback if report doesn't exist
+    from routes.auth import get_sp_client
+    sp = get_sp_client()
+    user_info = {}
+    if sp:
+        user = sp.current_user()
+        images = user.get("images", [])
+        user_info = {
+            "display_name": user.get("display_name", "User"),
+            "image": images[0]["url"] if images else None
+        }
+
+    report = get_user_report(user_id) if user_id else None
+    
+    return render_template("CRITIC_OS_Dossier_Page.html", report=report, user=user_info)
+
 if __name__ == "__main__":
     app.run(debug=True)

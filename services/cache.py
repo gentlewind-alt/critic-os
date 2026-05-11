@@ -78,3 +78,31 @@ def set_user_limit_spent(user_id: str):
         logger.info(f"Analysis limit set for user: {user_id}")
     except Exception as e:
         logger.error(f"Redis limit set error for {user_id}: {e}")
+
+# ==========================
+# REPORT STORAGE
+# ==========================
+
+def save_user_report(user_id: str, report_data: Dict):
+    """Saves the final analysis report for the dossier page."""
+    if not user_id:
+        return
+    try:
+        key = f"user_report:{user_id}"
+        redis_client.set(key, json.dumps(report_data), ex=31536000) # Save for 1 year
+        logger.info(f"Report saved for user: {user_id}")
+    except Exception as e:
+        logger.error(f"Redis report save error for {user_id}: {e}")
+
+def get_user_report(user_id: str) -> Optional[Dict]:
+    """Retrieves the analysis report for the dossier page."""
+    if not user_id:
+        return None
+    try:
+        key = f"user_report:{user_id}"
+        data = redis_client.get(key)
+        if data:
+            return json.loads(data)
+    except Exception as e:
+        logger.error(f"Redis report get error for {user_id}: {e}")
+    return None

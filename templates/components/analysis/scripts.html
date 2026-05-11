@@ -885,19 +885,34 @@ async function handleEvent(event, isReplay = false) {
                 currentTokenQueue = null;
             }
 
-            // SHOW SHARE BUTTON
-            const shareBtn = document.getElementById('shareBtn');
-            if (shareBtn) {
-                shareBtn.style.display = 'block';
-                // Trigger transition to dossier
-                setTimeout(() => {
-                    const finalVerdict = messageContainer.querySelector('.message.profile:last-child .text-content').textContent;
-                    renderDossier(finalVerdict);
-                    toggleDossier(true);
-                }, 3000);
-            }
+            // AUTO-SAVE AND REDIRECT TO DOSSIER PAGE
+            addMessage('system', '>> SYNTHESIZING_REPORT...');
+            
+            const finalVerdict = messageContainer.querySelector('.message.profile:last-child .text-content').textContent;
+            const reportData = {
+                verdict: finalVerdict,
+                dossier: lastDossierData,
+                songs: completedRoasts.filter(s => s !== null)
+            };
 
-            addMessage('system', '>> ANALYSIS_COMPLETE. DOSSIER GENERATED.');
+            try {
+                await fetch('/save-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reportData)
+                });
+                
+                addMessage('system', '>> REPORT_SAVED. REDIRECTING TO SECURE_DOSSIER...');
+                
+                setTimeout(() => {
+                    window.location.href = '/dossier';
+                }, 3000);
+            } catch (e) {
+                console.error("Failed to save report:", e);
+                addMessage('system', '>> ERROR_SAVING_REPORT. MANUAL_VIEW_ENABLED.');
+                const shareBtn = document.getElementById('shareBtn');
+                if (shareBtn) shareBtn.style.display = 'block';
+            }
             break;
     }
 }
