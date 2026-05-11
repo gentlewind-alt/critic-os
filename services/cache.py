@@ -45,6 +45,17 @@ def has_reached_limit(user_id: str) -> bool:
     """Checks if the user has already performed their one-time analysis."""
     if not user_id:
         return False
+    
+    # DEVELOPMENT GAP: Allow bypass for specific users
+    bypass_raw = os.getenv("BYPASS_LIMIT_USERS", "")
+    bypass_users = [u.strip() for u in bypass_raw.split(",") if u.strip()]
+    
+    if user_id in bypass_users:
+        logger.info(f"[DIAGNOSTIC] Bypass check: SUCCESS for {user_id}")
+        return False
+    
+    logger.info(f"[DIAGNOSTIC] Bypass check: FAILED for {user_id}. Whitelist: {bypass_users}")
+
     try:
         return redis_client.get(f"user_limit:{user_id}") == "spent"
     except Exception as e:
@@ -55,6 +66,12 @@ def set_user_limit_spent(user_id: str):
     """Marks the user's one-time analysis as spent."""
     if not user_id:
         return
+
+    # DEVELOPMENT GAP: Don't mark as spent for bypass users
+    bypass_users = os.getenv("BYPASS_LIMIT_USERS", "").split(",")
+    if user_id in bypass_users:
+        return
+
     try:
         # Set with no expiration (or very long one, e.g., 1 year)
         redis_client.set(f"user_limit:{user_id}", "spent", ex=31536000) 
