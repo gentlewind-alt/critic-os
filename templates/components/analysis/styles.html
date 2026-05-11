@@ -128,10 +128,29 @@ body.light-mode::before {
     background: var(--card-bg);
 }
 
-.persona-card:hover {
-    border-color: var(--accent-color);
-    background: var(--hover-bg);
-    box-shadow: 0 0 15px var(--hover-shadow);
+.persona-card.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(1);
+    position: relative;
+    border-color: var(--border-color) !important;
+    background: rgba(10, 10, 10, 0.5) !important;
+    box-shadow: none !important;
+}
+
+.persona-card.disabled:hover::after {
+    content: attr(data-label);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #000;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 10px;
+    white-space: nowrap;
+    z-index: 10;
+    border: 1px solid #fff;
 }
 
 .persona-card h3 {

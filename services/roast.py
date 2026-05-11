@@ -128,7 +128,7 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
         5. Use SIMPLE English. MAXIMUM 40 WORDS."""
 
     # Grounding instructions if interaction exists
-    grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state}. You MUST naturally weave this fact into the roast. It is more important than the humor reference." if interaction_state else ""
+    grounding = f"\n### USER PSYCHOLOGY (HIGH PRIORITY)\nThe user {interaction_state}. Use this to influence the confidence and aggressive framing of your roast. If they confirmed, double down on the insult. If they denied, sardonically mock their lack of self-awareness." if interaction_state else ""
 
     metadata_context = f"Vibe: {emotions_str}"
     lyrics_section = f"### LYRICS\n{lyrics}" if lyrics_found else "### LYRICS\n[LYRICS NOT FOUND: SONG TOO OBSCURE]"

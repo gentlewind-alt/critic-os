@@ -466,6 +466,7 @@ async function submitAnswer(choice) {
     const song = enrichedSongs[songIndex];
     const qText = document.getElementById('questionText').textContent;
     const optionText = choice === 'A' ? document.getElementById('optionA').textContent : document.getElementById('optionB').textContent;
+    const intent = qModule.dataset.intentA && choice === 'A' ? qModule.dataset.intentA : qModule.dataset.intentB;
     
     // Disable buttons and show loading
     document.getElementById('optionA').disabled = true;
@@ -474,8 +475,8 @@ async function submitAnswer(choice) {
     const displayContent = document.getElementById('activeRoastDisplay').querySelector('.text-content');
     displayContent.textContent = '>> RE-GROUNDING AI_CORE_LOGIC...';
     
-    // Map choice to state accurately
-    const state = `confirmed they chose '${optionText}' when asked '${qText}'`;
+    // Map choice to state accurately using intent
+    const state = `${intent} they chose '${optionText}' when asked '${qText}'`;
     
     try {
         const response = await fetch('/stream-answer', {
@@ -768,10 +769,17 @@ async function handleEvent(event, isReplay = false) {
                 qText.textContent = event.question_module.question;
                 qModule.dataset.phrase = event.question_module.phrase;
                 qModule.dataset.songIndex = event.index;
+                qModule.dataset.intentA = event.question_module.intent?.A || 'confirmed';
+                qModule.dataset.intentB = event.question_module.intent?.B || 'denied';
+                
+                const btnA = document.getElementById('optionA');
+                const btnB = document.getElementById('optionB');
+                btnA.textContent = `[ ${event.question_module.options.A.toUpperCase()} ]`;
+                btnB.textContent = `[ ${event.question_module.options.B.toUpperCase()} ]`;
                 
                 // Keep buttons disabled initially (wait for typing to finish)
-                document.getElementById('optionA').disabled = true;
-                document.getElementById('optionB').disabled = true;
+                btnA.disabled = true;
+                btnB.disabled = true;
             } else {
                 qModule.style.display = 'none';
             }

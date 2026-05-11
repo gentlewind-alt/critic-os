@@ -47,7 +47,7 @@ def generate_ai_question(song: Dict, persona: str = "normal", history: List[str]
     persona_prompt = QUESTION_PERSONA_PROMPTS.get(persona, QUESTION_PERSONA_PROMPTS["normal"])
 
     prompt = f"""{persona_prompt}
-Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyrics context, ask ONE short question (max 15 words) to the user.
+Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyrics context, ask ONE short, binary-compatible question (max 15 words) to the user.
 
 ### PREVIOUS INTERACTION CONTEXT
 {history_str}
@@ -56,10 +56,12 @@ Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyr
 {lyrics}
 
 ### RULES
-1. DO NOT repeat themes from the previous interaction context.
-2. Provide two short options (A and B).
-3. If the lyrics are marked as [INSTRUMENTAL], ask a question about the lack of lyrics or the pure musical vibe.
-4. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}}}
+1. NEVER ask "Why" or for an explanation. Frame the question as a psychological confirmation or a behavioral tendency check.
+2. The question must be answerable with a simple confirmation or denial.
+3. Provide two short, personality-driven options (A and B) that represent "Confirmation" and "Denial" (e.g., "Called out" vs "Reach", "Guilty" vs "Not even").
+4. DO NOT repeat themes from the previous interaction context.
+5. If the lyrics are marked as [INSTRUMENTAL], ask a question about the lack of lyrics or the pure musical vibe.
+6. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}, "intent": {{"A": "confirmed", "B": "denied"}}}}
 """
 
     try:
