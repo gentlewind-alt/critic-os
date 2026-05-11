@@ -305,16 +305,19 @@ def get_collections():
     if not sp: return jsonify({"error": "Not authenticated"}), 401
 
     try:
+        # Get user_id and check limit
+        user = debug_spotify_request("current_user", sp)
+        user_id = user.get('id')
+        session['user_id'] = user_id
+
+        from services.cache import has_reached_limit
+        if has_reached_limit(user_id):
+            return jsonify({
+                "error": "limit_reached",
+                "message": "You've already performed your one-time analysis. Come back in your next life."
+            }), 403
+
         # Get token info for logging purposes in debug_spotify_request
-        sp_oauth = create_spotify_oauth()
-        token_info = sp_oauth.cache_handler.get_cached_token()
-        
-        # Ensure user_id is in session
-        user_id = session.get('user_id')
-        if not user_id:
-            user = debug_spotify_request("current_user", sp)
-            user_id = user.get('id')
-            session['user_id'] = user_id
 
         liked_total = 0
         try:

@@ -63,8 +63,23 @@ def stream(session_id):
     profile_custom_prompt = request.json.get("profile_custom_prompt") # Get profile custom prompt
     collection_name = request.json.get("collection_name", "your collection")
     
+    from flask import session
+    from services.cache import has_reached_limit, set_user_limit_spent
+    user_id = session.get('user_id')
+
+    # Guard: Check limit before streaming
+    if user_id and has_reached_limit(user_id):
+        return jsonify({
+            "error": "limit_reached",
+            "message": "You've already performed your one-time analysis."
+        }), 403
+
     def event_stream():
         try:
+            # Mark as spent once the stream actually starts
+            if user_id:
+                set_user_limit_spent(user_id)
+
             for e in run_pipeline_optimized(enriched_songs, persona, custom_prompt, profile_custom_prompt, collection_name):
                 yield f"data: {json.dumps(e)}\n\n"
         except Exception as e:

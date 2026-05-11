@@ -36,3 +36,28 @@ def cache_set(key, value, ex=3600):
         redis_client.set(key, json.dumps(value), ex=ex)
     except Exception as e:
         logger.error(f"Redis set error for {key}: {e}")
+
+# ==========================
+# USER LIMIT HELPERS
+# ==========================
+
+def has_reached_limit(user_id: str) -> bool:
+    """Checks if the user has already performed their one-time analysis."""
+    if not user_id:
+        return False
+    try:
+        return redis_client.get(f"user_limit:{user_id}") == "spent"
+    except Exception as e:
+        logger.error(f"Redis limit check error for {user_id}: {e}")
+        return False
+
+def set_user_limit_spent(user_id: str):
+    """Marks the user's one-time analysis as spent."""
+    if not user_id:
+        return
+    try:
+        # Set with no expiration (or very long one, e.g., 1 year)
+        redis_client.set(f"user_limit:{user_id}", "spent", ex=31536000) 
+        logger.info(f"Analysis limit set for user: {user_id}")
+    except Exception as e:
+        logger.error(f"Redis limit set error for {user_id}: {e}")

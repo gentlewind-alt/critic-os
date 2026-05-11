@@ -113,6 +113,21 @@ async function openCollectionSelector() {
         }
         
         const data = await res.json();
+        
+        if (res.status === 403 && data.error === 'limit_reached') {
+            addLog("Access Denied: One-time analysis limit reached.", "error");
+            collectionList.innerHTML = `<div class="loading-text" style="color:var(--accent-color); font-size: 14px; text-align: center; padding: 20px;">
+                YOU'VE HAD YOUR FUN.<br><br>
+                <span style="font-size: 10px; color: var(--dim-text);">One-time analysis limit reached for this account. Come back in your next life.</span>
+            </div>`;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "[ LIMIT REACHED ]";
+                btn.style.opacity = "0.5";
+            }
+            return;
+        }
+
         if (res.status === 403 && data.error === 'insufficient_scope') {
             addLog("Scope mismatch detected. Re-authentication required.", "error");
             alert("New permissions are required. Logging out...");
