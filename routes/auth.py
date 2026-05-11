@@ -208,29 +208,39 @@ spotify_session.mount("https://", adapter)
 spotify_session.mount("http://", adapter)
 
 def get_sp_client(timeout=10):
-    sp_oauth = create_spotify_oauth()
+    """
+    STRICT USER AUTH: Returns a Spotify client only if a valid user token exists.
+    Prevents falling back to anonymous Client Credentials which cause 403s on Vercel.
+    """
     try:
+        sp_oauth = create_spotify_oauth()
         token = sp_oauth.cache_handler.get_cached_token()
+        
         if not token:
+            logger.warning("[AUTH] No user token found in cache.")
             return None
             
-        # sp_oauth will handle refreshing if needed when we call methods,
-        # but we can explicitly refresh if expired to ensure the cache is updated.
+        # Handle expiration
         if sp_oauth.is_token_expired(token):
-            logger.info("Token expired. Refreshing...")
-            token = sp_oauth.refresh_access_token(token['refresh_token'])
+            logger.info("[AUTH] Token expired. Refreshing...")
+            try:
+                token = sp_oauth.refresh_access_token(token['refresh_token'])
+            except Exception as e:
+                logger.error(f"[AUTH] Refresh failed: {e}")
+                return None
             
         if not sp_oauth.validate_token(token):
+            logger.warning("[AUTH] Token validation failed.")
             return None
             
-        # Return client with the refreshed token and shared session
+        # Return client LOCKED to this user token
         return spotipy.Spotify(
             auth=token['access_token'], 
             requests_timeout=timeout,
             requests_session=spotify_session
         )
     except Exception as e:
-        logger.error(f"Failed to initialize Spotify client: {e}")
+        logger.error(f"[AUTH] Client init error: {e}")
         return None
 
 @auth_bp.route("/debug-token")
