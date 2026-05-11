@@ -340,37 +340,35 @@ def get_collections():
             liked_total = liked_res.get('total', 0)
         except: pass
 
-        # Fetch playlists
+        # Fetch playlists with explicit fields to ensure counts are included
         playlists_res = debug_spotify_request("current_user_playlists", sp, limit=50)
         items = playlists_res.get('items', []) if playlists_res else []
         
-        # DEEP DIAGNOSTIC: Log the first 3 playlists raw
-        if items:
-            for i in range(min(3, len(items))):
-                logger.info(f"[DIAGNOSTIC] RAW PLAYLIST {i} DATA: {str(items[i])[:500]}")
+        # Get access token for explicit passing to prevent "anonymous drift"
+        current_token = sp.auth if hasattr(sp, 'auth') else None
 
         playlists = []
+        consecutive_errors = 0
+        
         for p in items:
             if not p: continue
+            if consecutive_errors > 3: 
+                logger.warning("[DIAGNOSTIC] Circuit breaker triggered. Skipping further fallbacks.")
+                break
 
             p_id = p.get('id')
             p_name = p.get('name')
             
-            # 1. Check initial count
             tracks_info = p.get('tracks', {})
-            initial_count = 0
-            if isinstance(tracks_info, dict):
-                initial_count = tracks_info.get('total', 0) or 0
-            
+            initial_count = tracks_info.get('total', 0) if isinstance(tracks_info, dict) else 0
             total_tracks = initial_count
-            logger.info(f"[DIAGNOSTIC] Processing {p_name} (ID: {p_id}) | Initial: {initial_count}")
-
-            # 2. Safety Fallback: Trigger if initial is 0
-            # On Vercel/Production, the summary often returns 0 even if full.
+            
+            # Safety Fallback
             if initial_count == 0:
                 try:
-                    logger.info(f"[DIAGNOSTIC] Running fallback count check for {p_name}...")
-                    # Limit 1 is enough to get the 'total' field from the items endpoint
+                    # Small jitter to avoid 429 on Vercel
+                    time.sleep(0.1) 
+                    
                     check = debug_spotify_request(
                         "playlist_items", 
                         sp, 
@@ -379,11 +377,11 @@ def get_collections():
                     )
                     if check and isinstance(check, dict):
                         total_tracks = check.get('total', 0) or 0
-                        logger.info(f"[DIAGNOSTIC] Fallback SUCCESS for {p_name}: {total_tracks} tracks found.")
+                        consecutive_errors = 0 # Reset on success
                 except Exception as e:
-                    logger.error(f"[DIAGNOSTIC] Fallback FAILED for {p_name}: {e}")
+                    consecutive_errors += 1
+                    logger.debug(f"[DIAGNOSTIC] Fallback failed for {p_name}. Error count: {consecutive_errors}")
 
-            # Only include playlists that actually have tracks
             if total_tracks > 0:
                 # Defensive image parsing
                 image_url = ""
