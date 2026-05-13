@@ -301,6 +301,8 @@ resetBtn.onclick = () => {
     if (confirm("RESET SESSION? All generation progress will be lost (songs are kept).")) {
         sessionStorage.removeItem('os_events');
         sessionStorage.removeItem('os_persona');
+        sessionStorage.removeItem('os_qa_pairs');
+        sessionStorage.removeItem('os_final_report');
         window.location.reload();
     }
 };
@@ -527,6 +529,8 @@ async function submitAnswer(choice) {
         await waitForQueue();
         
         // Update completedRoasts with the regrounded text
+        if (song) song.roast = displayContent.textContent;
+        
         if (!completedRoasts[songIndex]) {
             completedRoasts[songIndex] = {
                 track: song ? song.track_name : 'Unknown',
@@ -837,7 +841,8 @@ async function handleEvent(event, isReplay = false) {
                     
                     // CAPTURE FOR COLLECTIVE LIST
                     const song = enrichedSongs[event.index];
-                    const fullText = displayBody.querySelector('.text-content').textContent;
+                    const dBody = document.getElementById('activeRoastDisplay');
+                    const fullText = dBody.querySelector('.text-content').textContent;
                     
                     if (song) {
                         song.roast = fullText;
@@ -851,7 +856,7 @@ async function handleEvent(event, isReplay = false) {
                         roast: fullText
                     };
 
-                    displayBody.classList.add('fade-out');
+                    dBody.classList.add('fade-out');
                     
                     // Wait for fade-out animation to complete (1.5s as per CSS)
                     await new Promise(r => setTimeout(r, 1500));

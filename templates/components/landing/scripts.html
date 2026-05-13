@@ -241,6 +241,8 @@ async function selectCollection(id, name) {
         // Store for analysis page
         addLog("Saving state to local archive...", "success");
         sessionStorage.removeItem('os_events');
+        sessionStorage.removeItem('os_qa_pairs');
+        sessionStorage.removeItem('os_final_report');
         sessionStorage.setItem('enrichedSongs', JSON.stringify(enrichedData.data));
         sessionStorage.setItem('os_collection_name', name);
         
