@@ -212,21 +212,13 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
     # ==========================
     # FINAL STAGE
     # ==========================
-    from services.roast import generate_final_verdict_stream, generate_dossier_stats
+    from services.roast import generate_final_verdict_stream
     yield _event("state", PipelineState.FINAL)
     profile = _build_profile(enriched_songs)
 
-    # NEW: Generate Dossier Stats for the Cinematic Share Card
-    try:
-        dossier = generate_dossier_stats(enriched_songs, persona)
-    except Exception as e:
-        logger.error(f"Dossier Sync Error: {e}")
-        dossier = None
-
     yield {
         "type": "final_start",
-        "profile": profile,
-        "dossier": dossier
+        "profile": profile
     }
 
     verdict_chunks = []

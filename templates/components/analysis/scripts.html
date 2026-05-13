@@ -402,6 +402,11 @@ async function handleProfileResponse(choice) {
     
     const state = `admitted that '${optionText}' when asked '${qText}' in their profile overview`;
     
+    // STORE QA FOR DASHBOARD
+    let qaPairs = JSON.parse(sessionStorage.getItem('os_qa_pairs') || '[]');
+    qaPairs.push({ q: qText, a: optionText });
+    sessionStorage.setItem('os_qa_pairs', JSON.stringify(qaPairs));
+    
     try {
         const response = await fetch('/stream-profile-answer', {
             method: 'POST',
@@ -477,6 +482,11 @@ async function submitAnswer(choice) {
     
     // Map choice to state accurately using intent
     const state = `${intent} they chose '${optionText}' when asked '${qText}'`;
+    
+    // STORE QA FOR DASHBOARD
+    let qaPairs = JSON.parse(sessionStorage.getItem('os_qa_pairs') || '[]');
+    qaPairs.push({ q: qText, a: optionText });
+    sessionStorage.setItem('os_qa_pairs', JSON.stringify(qaPairs));
     
     try {
         const response = await fetch('/stream-answer', {
@@ -825,11 +835,15 @@ async function handleEvent(event, isReplay = false) {
                     // READ DELAY: Wait 5 seconds so user can actually READ the roast
                     await new Promise(r => setTimeout(r, 5000));
                     
-                    const displayBody = document.getElementById('activeRoastDisplay');
-                    const fullText = displayBody.querySelector('.text-content').textContent;
-                    
                     // CAPTURE FOR COLLECTIVE LIST
                     const song = enrichedSongs[event.index];
+                    const fullText = displayBody.querySelector('.text-content').textContent;
+                    
+                    if (song) {
+                        song.roast = fullText;
+                        sessionStorage.setItem('enrichedSongs', JSON.stringify(enrichedSongs));
+                    }
+
                     completedRoasts[event.index] = {
                         track: song ? song.track_name : 'Unknown',
                         artist: song ? song.artist_name : 'Unknown',
@@ -885,96 +899,161 @@ async function handleEvent(event, isReplay = false) {
                 currentTokenQueue = null;
             }
 
-            // AUTO-SAVE AND REDIRECT TO DOSSIER PAGE
-            addMessage('system', '>> SYNTHESIZING_REPORT...');
-            
-            const finalVerdict = messageContainer.querySelector('.message.profile:last-child .text-content').textContent;
-            const reportData = {
-                verdict: finalVerdict,
-                dossier: lastDossierData,
-                songs: completedRoasts.filter(s => s !== null)
-            };
-
+            // --- GENERATE FINAL REPORT JSON ---
             try {
-                await fetch('/save-report', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reportData)
+                const emotionMap = {
+                    "LABEL_0": "admiration", "LABEL_1": "amusement", "LABEL_2": "anger", "LABEL_3": "annoyance",
+                    "LABEL_4": "approval", "LABEL_5": "caring", "LABEL_6": "confusion", "LABEL_7": "curiosity",
+                    "LABEL_8": "desire", "LABEL_9": "disappointment", "LABEL_10": "disapproval", "LABEL_11": "disgust",
+                    "LABEL_12": "embarrassment", "LABEL_13": "excitement", "LABEL_14": "fear", "LABEL_15": "gratitude",
+                    "LABEL_16": "grief", "LABEL_17": "joy", "LABEL_18": "love", "LABEL_19": "nervousness",
+                    "LABEL_20": "optimism", "LABEL_21": "pride", "LABEL_22": "realization", "LABEL_23": "relief",
+                    "LABEL_24": "remorse", "LABEL_25": "sadness", "LABEL_26": "surprise", "LABEL_27": "neutral"
+                };
+
+                const getReadableEmotion = (label) => {
+                    if (!label) return 'neutral';
+                    const l = label.toUpperCase();
+                    return emotionMap[l] || label.toLowerCase();
+                };
+
+                const finalMsgs = messageContainer.querySelectorAll('.message.profile .text-content');
+                const lastFinalMsg = finalMsgs[finalMsgs.length - 1];
+                const finalVerdict = lastFinalMsg ? lastFinalMsg.textContent : "";
+                
+                const qaPairs = JSON.parse(sessionStorage.getItem('os_qa_pairs') || '[]');
+                const userName = sessionStorage.getItem('userName') || 'USER';
+                const userImage = sessionStorage.getItem('userImage') || '';
+                
+                // Calculate dominant emotion from all songs
+                const emotionFreq = {};
+                enrichedSongs.forEach(s => {
+                    const topEmo = getReadableEmotion(s.Emotion?.[0]);
+                    emotionFreq[topEmo] = (emotionFreq[topEmo] || 0) + 1;
                 });
+                const dominantEmotion = Object.keys(emotionFreq).reduce((a, b) => emotionFreq[a] > emotionFreq[b] ? a : b, 'neutral');
+
+                const punchlines = [
+                    "You don't just listen to music. You relive situationships.",
+                    "You thrive in the void. Your playlist is a cry for help.",
+                    "Your taste is toxic. You romanticize your own chaos.",
+                    "You're stuck in a loop. You enjoy the pain too much."
+                ];
+
+                const report = {
+                    user: {
+                        name: userName,
+                        avatar: userImage,
+                        memberSince: new Date().toLocaleDateString('default', { month: 'long', year: 'numeric' }),
+                        finalVerdict: finalVerdict
+                    },
+                    stats: {
+                        brutality: Math.floor(Math.random() * 20) + 75,
+                        dominantEmotion: dominantEmotion,
+                        spectrum: emotionFreq,
+                        punchline: punchlines[Math.floor(Math.random() * punchlines.length)]
+                    },
+                    qa: qaPairs,
+                    songs: enrichedSongs.map(s => {
+                        const songEmos = {};
+                        if (s.emotion_analysis?.emotions_detected) {
+                            Object.entries(s.emotion_analysis.emotions_detected).forEach(([emo, val]) => {
+                                songEmos[getReadableEmotion(emo)] = val;
+                            });
+                        } else {
+                            songEmos[getReadableEmotion(s.Emotion?.[0])] = 1.0;
+                        }
+                        
+                        return {
+                            title: s.track_name,
+                            artist: s.artist_name,
+                            image: s.album_image,
+                            roast: s.roast || "",
+                            emotions: songEmos
+                        };
+                    })
+                };
                 
-                addMessage('system', '>> REPORT_SAVED. REDIRECTING TO SECURE_DOSSIER...');
-                
-                setTimeout(() => {
-                    window.location.href = '/dossier';
-                }, 3000);
-            } catch (e) {
-                console.error("Failed to save report:", e);
-                addMessage('system', '>> ERROR_SAVING_REPORT. MANUAL_VIEW_ENABLED.');
-                const shareBtn = document.getElementById('shareBtn');
-                if (shareBtn) shareBtn.style.display = 'block';
+                sessionStorage.setItem('os_final_report', JSON.stringify(report));
+                console.log("FINAL_REPORT_GENERATED", report);
+            } catch (err) {
+                console.error("Failed to generate final report:", err);
             }
+
+            // RENDER THE GRID
+            const grid = document.createElement('div');
+            grid.className = 'collective-grid';
+            
+            completedRoasts.forEach(item => {
+                if (!item) return;
+                const gridItem = document.createElement('div');
+                gridItem.className = 'grid-item';
+                gridItem.innerHTML = `
+                    <img src="${item.image}" alt="${item.track}">
+                    <div class="grid-overlay">
+                        <h4>${item.track}</h4>
+                        <p>${item.roast}</p>
+                    </div>
+                `;
+                grid.appendChild(gridItem);
+            });
+
+            messageContainer.appendChild(grid);
+            
+            // ADD COPY BUTTON FOR FINAL VERDICT
+            const finalMsgsAfter = messageContainer.querySelectorAll('.message.profile .text-content');
+            const lastFinalMsgAfter = finalMsgsAfter[finalMsgsAfter.length - 1];
+            if (lastFinalMsgAfter) {
+                const copyBtn = document.createElement('div');
+                copyBtn.className = 'theme-toggle';
+                copyBtn.style.marginTop = '15px';
+                copyBtn.style.display = 'inline-block';
+                copyBtn.style.fontSize = '10px';
+                copyBtn.textContent = '[ COPY FINAL VERDICT ]';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(lastFinalMsgAfter.textContent);
+                    copyBtn.textContent = '[ COPIED! ]';
+                    setTimeout(() => copyBtn.textContent = '[ COPY FINAL VERDICT ]', 2000);
+                };
+                messageContainer.appendChild(copyBtn);
+            }
+
+            // ADD VIEW DASHBOARD BUTTON
+            const dashboardBtn = document.createElement('div');
+            dashboardBtn.className = 'theme-toggle';
+            dashboardBtn.style.marginTop = '15px';
+            dashboardBtn.style.marginLeft = '10px';
+            dashboardBtn.style.display = 'inline-block';
+            dashboardBtn.style.fontSize = '10px';
+            dashboardBtn.style.borderColor = 'var(--accent-color)';
+            dashboardBtn.style.color = 'var(--accent-color)';
+            dashboardBtn.textContent = '[ VIEW FULL REPORT ]';
+            dashboardBtn.onclick = () => {
+                window.location.href = '/dashboard';
+            };
+            messageContainer.appendChild(dashboardBtn);
+
+            // ADD DOWNLOAD JSON BUTTON
+            const downloadBtn = document.createElement('div');
+            downloadBtn.className = 'theme-toggle';
+            downloadBtn.style.marginTop = '15px';
+            downloadBtn.style.marginLeft = '10px';
+            downloadBtn.style.display = 'inline-block';
+            downloadBtn.style.fontSize = '10px';
+            downloadBtn.textContent = '[ DOWNLOAD DATA ]';
+            downloadBtn.onclick = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(sessionStorage.getItem('os_final_report'));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `CRITIC_OS_REPORT_${userName}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            };
+            messageContainer.appendChild(downloadBtn);
+
+            addMessage('system', '>> ANALYSIS_COMPLETE. SESSION ENDED.');
             break;
-    }
-}
-
-function renderDossier(verdict) {
-    if (!lastDossierData) return;
-
-    const dossierAvatar = document.getElementById('dossierAvatar');
-    const dossierName = document.getElementById('dossierName');
-    const dossierArchetype = document.getElementById('dossierArchetype');
-    const dossierStats = document.getElementById('dossierStats');
-    const dossierVerdict = document.getElementById('dossierVerdict');
-    const dossierGallery = document.getElementById('dossierGallery');
-
-    // Set User Info
-    dossierAvatar.src = sessionStorage.getItem('userImage') || 'https://placehold.co/80';
-    dossierName.textContent = (sessionStorage.getItem('userName') || 'USER_NULL').toUpperCase();
-
-    // Set AI Archetype
-    dossierArchetype.textContent = lastDossierData.archetype.toUpperCase();
-    
-    // Set Stats
-    dossierStats.innerHTML = '';
-    for (const [label, value] of Object.entries(lastDossierData.stats)) {
-        dossierStats.innerHTML += `
-            <div class="stat-item">
-                <div class="stat-label">${label}</div>
-                <div class="stat-value">${value}</div>
-            </div>
-        `;
-    }
-
-    // Set Verdict
-    dossierVerdict.textContent = verdict;
-
-    // Build Gallery
-    dossierGallery.innerHTML = '';
-    completedRoasts.forEach(song => {
-        if (!song) return;
-        const item = document.createElement('div');
-        item.className = 'dossier-item';
-        item.innerHTML = `
-            <img src="${song.image}" alt="${song.track}">
-            <div class="dossier-item-overlay">
-                <p><strong>${song.track.toUpperCase()}</strong></p>
-                <p style="margin-top:5px; font-size: 7px; opacity: 0.8;">${song.roast}</p>
-            </div>
-        `;
-        dossierGallery.appendChild(item);
-    });
-}
-
-function toggleDossier(forceOpen = null) {
-    const overlay = document.getElementById('dossierOverlay');
-    if (forceOpen === true) {
-        overlay.style.display = 'flex';
-        overlay.style.opacity = '1';
-    } else if (forceOpen === false) {
-        overlay.style.display = 'none';
-    } else {
-        const isHidden = getComputedStyle(overlay).display === 'none';
-        overlay.style.display = isHidden ? 'flex' : 'none';
     }
 }
 

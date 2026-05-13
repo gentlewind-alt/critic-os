@@ -396,52 +396,6 @@ Start now."""
 
 
 # ==========================
-# DOSSIER GENERATION
-# ==========================
-def generate_dossier_stats(songs: List[Dict], persona: str = "normal") -> Dict:
-    """Generates the AI archetype and psychological stats for the cinematic share card."""
-    summary = []
-    for s in songs:
-        summary.append(f"- {s.get('track_name')} ({', '.join(s.get('Emotion', []))})")
-    
-    history = "\n".join(summary)
-    persona_info = PERSONAS.get(persona, PERSONAS["normal"])
-    persona_desc = persona_info["desc"]
-
-    prompt = f"""You are {persona_desc}. Based on this user's music history, generate a unique "Listening Archetype" title and 4 psychological metrics.
-
-### HISTORY
-{history}
-
-### RULES
-1. Archetype: A creative, 2-4 word title (e.g., "Emotionally Unavailable Archivist").
-2. Stats: Generate 4 creative metrics as percentages or scores (e.g., "Toxic Nostalgia": "84%").
-3. Tone: Brutal, intelligent, and psychological.
-4. Return ONLY JSON: {{"archetype": "...", "stats": {{"Metric1": "Value", "Metric2": "Value", "Metric3": "Value", "Metric4": "Value"}}}}
-"""
-
-    try:
-        response = groq_client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
-            max_tokens=150,
-            response_format={"type": "json_object"}
-        )
-        return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Dossier Generation Error: {e}")
-        return {
-            "archetype": "Main Character Complex",
-            "stats": {
-                "Emotional Instability": "92%",
-                "Relationship Damage": "High",
-                "Midnight Spirals": "Frequent",
-                "Self-Awareness": "0%"
-            }
-        }
-
-# ==========================
 # CORE GENERATION (FINAL VERDICT OPTIMIZED - PASS 1)
 # ==========================
 def _generate_final_verdict_raw(songs: List[Dict], persona: str = "normal", collection_name: str = "your collection") -> str:

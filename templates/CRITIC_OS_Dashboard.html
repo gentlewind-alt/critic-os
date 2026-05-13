@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>CRITIC_OS - SYSTEM_JUDGING</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "critic": {
+                        900: '#08120E',
+                        800: '#111613',
+                        accent: '#00FF9C',
+                        border: 'rgba(0, 255, 156, 0.15)'
+                      },
+                      "on-primary": "#2e3131",
+                      "on-tertiary-container": "#6a635f",
+                      "on-secondary-container": "#a7beb2",
+                      "outline": "#8d9191",
+                      "surface-container-low": "#1c1b1b",
+                      "on-primary-container": "#626564",
+                      "on-error-container": "#ffdad6",
+                      "surface-container-lowest": "#0e0e0e",
+                      "surface-bright": "#3a3939",
+                      "on-secondary-fixed-variant": "#374b42",
+                      "on-error": "#690005",
+                      "surface-variant": "#353534",
+                      "tertiary": "#ffffff",
+                      "surface-dim": "#131313",
+                      "secondary-fixed-dim": "#b5ccc0",
+                      "on-secondary": "#21342c",
+                      "error": "#ffb4ab",
+                      "surface": "#131313",
+                      "primary-fixed": "#e1e3e2",
+                      "primary-container": "#e1e3e2",
+                      "primary": "#ffffff",
+                      "error-container": "#93000a",
+                      "on-surface-variant": "#c3c7c6",
+                      "surface-container-high": "#2a2a2a",
+                      "on-tertiary": "#342f2c",
+                      "on-tertiary-fixed-variant": "#4b4642",
+                      "on-secondary-fixed": "#0b1f18",
+                      "background": "#131313",
+                      "tertiary-fixed": "#eae1db",
+                      "outline-variant": "#434847",
+                      "secondary": "#b5ccc0",
+                      "tertiary-container": "#eae1db",
+                      "inverse-surface": "#e5e2e1",
+                      "on-background": "#e5e2e1",
+                      "primary-fixed-dim": "#c4c7c6",
+                      "on-surface": "#e5e2e1",
+                      "surface-container-highest": "#353534",
+                      "on-primary-fixed-variant": "#444747",
+                      "inverse-primary": "#5c5f5e",
+                      "on-primary-fixed": "#191c1c",
+                      "secondary-fixed": "#d1e8dc",
+                      "on-tertiary-fixed": "#1f1b17",
+                      "inverse-on-surface": "#313030",
+                      "tertiary-fixed-dim": "#cec5bf",
+                      "surface-tint": "#c4c7c6",
+                      "secondary-container": "#394d44",
+                      "surface-container": "#201f1f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "margin": "32px",
+                      "gutter": "24px",
+                      "container-max": "1440px"
+              },
+              "fontFamily": {
+                      "label-sm": ["Space Mono"],
+                      "headline-xl": ["Space Grotesk"],
+                      "body-md": ["Space Mono"],
+                      "headline-lg": ["Space Grotesk"],
+                      "headline-lg-mobile": ["Space Grotesk"],
+                      "technical-code": ["Space Mono"]
+              }
+            }
+          }
+        }
+      </script>
+<style>
+        body {
+            background-color: #08120E;
+            color: #e5e2e1;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background-color: rgba(8, 18, 14, 0.72);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(0, 255, 156, 0.15);
+            box-shadow: inset 0 0 20px rgba(0, 255, 156, 0.05);
+            transition: all 0.3s ease;
+        }
+        .glass-panel:hover {
+            border-color: rgba(0, 255, 156, 0.4);
+            box-shadow: 0 0 15px rgba(0, 255, 156, 0.2), inset 0 0 20px rgba(0, 255, 156, 0.1);
+        }
+        .neon-text {
+            color: #00FF9C;
+            text-shadow: 0 0 10px rgba(0, 255, 156, 0.5);
+        }
+        .neon-border {
+            border-color: #00FF9C;
+            box-shadow: 0 0 10px rgba(0, 255, 156, 0.3);
+        }
+        .cursor-blink {
+            display: inline-block;
+            width: 8px;
+            height: 1em;
+            background-color: #00FF9C;
+            animation: blink 1s step-end infinite;
+            vertical-align: bottom;
+            margin-left: 4px;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, rgba(0, 255, 156, 0.8), transparent);
+            animation: scan 4s linear infinite;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 10;
+        }
+        @keyframes scan {
+            0% { top: -10%; }
+            100% { top: 110%; }
+        }
+        .pulse-border {
+            animation: pulse-border 2s infinite;
+        }
+        @keyframes pulse-border {
+            0% { border-color: rgba(0, 255, 156, 0.3); box-shadow: 0 0 5px rgba(0, 255, 156, 0.1); }
+            50% { border-color: rgba(0, 255, 156, 0.8); box-shadow: 0 0 15px rgba(0, 255, 156, 0.4); }
+            100% { border-color: rgba(0, 255, 156, 0.3); box-shadow: 0 0 5px rgba(0, 255, 156, 0.1); }
+        }
+        .meter-circle {
+          stroke-dasharray: 283;
+          stroke-dashoffset: 283;
+          transition: stroke-dashoffset 2.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        #sentimentChart {
+            max-height: 250px;
+            filter: drop-shadow(0 0 10px rgba(0, 255, 156, 0.2));
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md overflow-hidden bg-[#08120E] text-on-surface h-screen w-screen flex">
+<!-- Background Decoration -->
+<div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
+    <div class="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#00FF9C] blur-[150px] opacity-[0.03]"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-primary blur-[150px] opacity-[0.02]"></div>
+</div>
+
+<!-- SideNavBar -->
+<nav class="bg-surface/70 backdrop-blur-xl h-screen w-72 flex flex-col fixed left-0 top-0 border-r border-outline/15 shadow-[inset_-10px_0_20px_rgba(255,255,255,0.02)] shadow-[0_0_30px_rgba(0,0,0,0.8)] z-40 hidden md:flex flex-col h-full justify-between">
+    <div class="flex flex-col flex-grow">
+        <div class="p-6 border-b border-outline/15 mb-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full border border-[#00FF9C]/30 flex items-center justify-center bg-[#00FF9C]/10 overflow-hidden relative">
+                    <span class="material-symbols-outlined text-[#00FF9C] absolute" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+                </div>
+                <div>
+                    <h1 class="font-headline-lg text-headline-lg font-bold tracking-tighter text-primary italic text-[24px]">CRITIC_OS</h1>
+                    <p class="font-technical-code text-label-sm text-[#00FF9C] tracking-widest mt-1">STATUS: JUDGING</p>
+                </div>
+            </div>
+            
+            <div class="mt-8 text-center flex flex-col items-center">
+                <div class="relative w-28 h-28 rounded-full p-1 bg-gradient-to-b from-[#00FF9C] to-transparent shadow-lg">
+                    <div class="w-full h-full rounded-full overflow-hidden border-4 border-[#08120E] bg-surface-dim">
+                        <img id="userAvatar" src="https://placehold.co/128" alt="avatar" class="w-full h-full object-cover">
+                    </div>
+                </div>
+                <h2 id="userName" class="mt-4 text-xl font-bold text-white tracking-tight">voidlistener</h2>
+                <div class="flex items-center justify-center gap-2 text-xs text-on-surface-variant mt-1">
+                    <span class="w-2 h-2 rounded-full bg-[#00FF9C] animate-pulse"></span>
+                    <span id="memberSince">Member since May 2023</span>
+                </div>
+            </div>
+        </div>
+        
+        <ul class="flex flex-col font-technical-code text-technical-code uppercase tracking-widest flex-grow px-2">
+            <li class="w-full mb-1">
+                <a class="text-primary bg-primary/10 border-r-2 border-[#00FF9C] py-3 px-4 flex items-center gap-3 w-full hover:bg-primary/5 transition-all" href="#">
+                    <span class="material-symbols-outlined">grid_view</span>
+                    DASHBOARD
+                </a>
+            </li>
+        </ul>
+
+        <div class="p-6 mt-auto">
+            <h3 class="text-[10px] text-[#00FF9C] uppercase tracking-widest font-bold mb-4">ANALYZED_TRACKS</h3>
+            <div id="albumCarousel" class="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto no-scrollbar pr-1">
+                <!-- Tracks Grid -->
+            </div>
+        </div>
+    </div>
+    <div class="p-6 border-t border-outline/15 text-[10px] text-on-surface-variant/50 font-technical-code">
+        SYSTEM_v4.2 // CRITICAL_ENGINE
+    </div>
+</nav>
+
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col md:ml-72 w-full h-screen relative overflow-hidden">
+    <!-- TopAppBar -->
+    <header class="bg-surface-container-low/80 backdrop-blur-lg border-b border-outline/15 flex justify-between items-center px-6 py-3 w-full z-30 flex-shrink-0">
+        <div class="flex items-center gap-4">
+            <div class="font-headline-lg text-headline-lg font-bold text-primary tracking-tight text-[16px]">ANALYST_REPORT // LIVE_FEED</div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="exportDashboard()" class="flex items-center gap-2 px-3 py-1.5 rounded border border-[#00FF9C]/30 text-[#00FF9C] font-technical-code text-[10px] font-bold hover:bg-[#00FF9C]/10 transition-all">
+                <span class="material-symbols-outlined text-xs">share</span>
+                EXPORT
+            </button>
+            <div class="w-7 h-7 border border-outline/30 rounded flex items-center justify-center bg-surface-dim overflow-hidden">
+                <span class="material-symbols-outlined text-on-surface-variant text-sm">person</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Canvas -->
+    <main class="flex-1 p-6 overflow-y-auto relative no-scrollbar bg-[#08120E]/50">
+        <div class="scanline"></div>
+        <div class="w-full h-full flex flex-col">
+            <!-- Headline Section -->
+            <div class="mb-6 border-b border-outline/15 pb-4">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="inline-block px-2 py-0.5 bg-[#00FF9C]/10 border border-[#00FF9C]/30 text-[#00FF9C] font-technical-code text-[9px] uppercase tracking-widest">
+                        &gt; ANALYSIS_STATUS: ACTIVE
+                    </span>
+                    <span id="behavioralPattern" class="inline-block px-2 py-0.5 bg-primary/5 border border-outline/30 text-on-surface-variant font-technical-code text-[9px] uppercase tracking-widest hidden">
+                        PATTERN: SCANNING...
+                    </span>
+                </div>
+                <h2 class="text-3xl md:text-4xl font-bold text-white uppercase tracking-tighter leading-tight">
+                    You don't just listen to music. <br/>
+                    <span id="summaryPunchline" class="text-on-surface-variant">You relive situationships.</span>
+                    <span class="cursor-blink"></span>
+                </h2>
+            </div>
+
+            <!-- Bento Grid Content -->
+            <div class="grid grid-cols-12 gap-4 flex-grow">
+                <!-- Main Roast Panel -->
+                <div class="col-span-12 lg:col-span-7 glass-panel rounded-lg p-6 min-h-[200px] flex flex-col justify-center relative overflow-hidden group">
+                    <div class="absolute top-3 left-4 font-technical-code text-[9px] text-on-surface-variant/50 uppercase tracking-widest">
+                        FINAL_VERDICT
+                    </div>
+                    <div class="relative z-10">
+                        <span class="material-symbols-outlined text-4xl text-[#00FF9C]/20 mb-2" style="font-variation-settings: 'FILL' 1;">format_quote</span>
+                        <p id="finalVerdict" class="text-xl md:text-2xl font-body-md text-white italic leading-snug">
+                            Your playlist is a diary you never had the courage to write. Every song screams unresolved emotions.
+                        </p>
+                    </div>
+                    <div class="absolute inset-0 pointer-events-none opacity-[0.02]" style="background-image: linear-gradient(#00FF9C 1px, transparent 1px), linear-gradient(90deg, #00FF9C 1px, transparent 1px); background-size: 20px 20px;"></div>
+                </div>
+
+                <!-- Radar Chart Panel -->
+                <div class="col-span-12 lg:col-span-5 glass-panel rounded-lg p-6 flex flex-col relative min-h-[200px]">
+                    <div class="flex items-center justify-between border-b border-outline/15 pb-2 mb-4">
+                        <h4 class="font-technical-code text-[9px] text-primary uppercase tracking-widest">SENTIMENT_SPECTRUM</h4>
+                        <span class="material-symbols-outlined text-[#00FF9C]/50 text-xs">psychology</span>
+                    </div>
+                    <div class="flex-1 flex items-center justify-center overflow-hidden">
+                        <canvas id="sentimentChart" class="!max-h-[180px]"></canvas>
+                    </div>
+                </div>
+
+                <!-- Album Dossier Panel -->
+                <div id="dossierPanel" class="col-span-12 glass-panel rounded-lg p-6 relative">
+                    <div class="flex flex-col lg:flex-row gap-6">
+                        <div class="w-32 h-32 md:w-40 md:h-40 flex-shrink-0 relative">
+                            <img id="dossierImg" src="https://placehold.co/400" alt="album art" class="w-full h-full object-cover rounded border border-outline/20 shadow-xl">
+                            <div class="absolute -bottom-1 -right-1 w-8 h-8 glass-panel rounded-full flex items-center justify-center text-[#00FF9C]">
+                                <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">album</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex-grow">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[9px] text-[#00FF9C] font-technical-code uppercase tracking-[0.3em]">TRACK_DOSSIER</span>
+                                <div class="h-[1px] flex-grow bg-[#00FF9C]/10"></div>
+                            </div>
+                            <h2 id="dossierTitle" class="text-2xl font-bold text-white tracking-tight mb-0.5">Dossier Loading...</h2>
+                            <h3 id="dossierArtist" class="text-sm text-on-surface-variant mb-4 uppercase tracking-wider">Artist Unknown</h3>
+                            
+                            <div id="dossierGenres" class="flex flex-wrap gap-1.5 mb-5">
+                                <!-- Dynamic Badges -->
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="text-[9px] text-on-surface-variant uppercase tracking-widest mb-2">AI_OBSERVATION</h4>
+                                    <div class="bg-[#00FF9C]/5 border border-[#00FF9C]/10 rounded p-3 italic text-xs text-zinc-300 leading-relaxed relative">
+                                        <p id="dossierRoast">Scanning track for vulnerabilities...</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center gap-6">
+                                    <div id="emotionBars" class="flex-grow space-y-3">
+                                        <!-- Bars -->
+                                    </div>
+                                    
+                                    <div class="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                                        <svg class="w-full h-full transform -rotate-90" viewbox="0 0 100 100">
+                                            <circle cx="50" cy="50" fill="none" r="45" stroke="rgba(0, 255, 156, 0.1)" stroke-width="6"></circle>
+                                            <circle id="intensityMeter" class="meter-circle" cx="50" cy="50" fill="none" r="45" stroke="#00FF9C" stroke-linecap="round" stroke-width="6"></circle>
+                                        </svg>
+                                        <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                            <span class="text-[6px] text-[#00FF9C] uppercase font-bold leading-none mb-0.5">INTENSITY</span>
+                                            <span id="intensityValue" class="text-xl font-bold text-white font-technical-code leading-none">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Interactions Panel -->
+                <div id="interactionsPanel" class="col-span-12 glass-panel rounded-lg p-6 relative hidden">
+                    <div class="flex items-center gap-2 mb-4 border-b border-outline/15 pb-2">
+                        <span class="text-[9px] text-on-surface-variant font-technical-code uppercase tracking-widest">SYSTEM_INTERCEPT // AI_QA_LOG</span>
+                        <span class="material-symbols-outlined text-[#00FF9C]/50 text-xs">terminal</span>
+                    </div>
+                    <div id="qaList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- QA items will be injected here -->
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="mt-4 py-3 border-t border-outline/10 flex justify-between items-center text-[8px] font-technical-code tracking-[0.2em] text-on-surface-variant/40 flex-shrink-0">
+                <div>©2024 CRITIC_OS // NEURO_TONE</div>
+                <div class="flex gap-4">
+                    <span>STATUS: OPERATIONAL</span>
+                    <span>CONNECTION: SECURE</span>
+                </div>
+            </footer>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Map internal model labels to human-readable emotions
+    const emotionMap = {
+        "LABEL_0": "admiration", "LABEL_1": "amusement", "LABEL_2": "anger", "LABEL_3": "annoyance",
+        "LABEL_4": "approval", "LABEL_5": "caring", "LABEL_6": "confusion", "LABEL_7": "curiosity",
+        "LABEL_8": "desire", "LABEL_9": "disappointment", "LABEL_10": "disapproval", "LABEL_11": "disgust",
+        "LABEL_12": "embarrassment", "LABEL_13": "excitement", "LABEL_14": "fear", "LABEL_15": "gratitude",
+        "LABEL_16": "grief", "LABEL_17": "joy", "LABEL_18": "love", "LABEL_19": "nervousness",
+        "LABEL_20": "optimism", "LABEL_21": "pride", "LABEL_22": "realization", "LABEL_23": "relief",
+        "LABEL_24": "remorse", "LABEL_25": "sadness", "LABEL_26": "surprise", "LABEL_27": "neutral"
+    };
+
+    const getReadableEmotion = (label) => {
+        if (!label) return 'neutral';
+        const l = label.toUpperCase();
+        return emotionMap[l] || label.toLowerCase();
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DATA INITIALIZATION ---
+        const report = JSON.parse(sessionStorage.getItem('os_final_report') || 'null');
+        const enrichedSongs = report ? report.songs : JSON.parse(sessionStorage.getItem('enrichedSongs') || '[]');
+        const user = report ? report.user : {
+            name: sessionStorage.getItem('userName') || 'voidlistener',
+            avatar: sessionStorage.getItem('userImage') || 'https://placehold.co/128',
+            memberSince: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
+            finalVerdict: ""
+        };
+        const stats = report ? report.stats : {
+            brutality: Math.floor(Math.random() * 20) + 75,
+            dominantEmotion: 'neutral',
+            spectrum: {}
+        };
+        const qa = report ? report.qa : [];
+
+        // --- USER INFO ---
+        document.getElementById('userAvatar').src = user.avatar || 'https://placehold.co/128';
+        document.getElementById('userName').textContent = user.name;
+        document.getElementById('memberSince').textContent = user.memberSince;
+
+        // --- SUMMARY & VERDICT ---
+        if (user.finalVerdict) {
+            document.getElementById('finalVerdict').textContent = user.finalVerdict;
+        }
+        const dynamicPunchline = stats.punchline || "The AI is still processing your questionable choices.";
+        document.getElementById('summaryPunchline').textContent = dynamicPunchline;
+
+        if (stats.pattern) {
+            const patternEl = document.getElementById('behavioralPattern');
+            patternEl.textContent = `PATTERN: ${stats.pattern.toUpperCase()}`;
+            patternEl.classList.remove('hidden');
+        }
+
+        // --- AI QA LOG ---
+        if (qa && qa.length > 0) {
+            const interactionsPanel = document.getElementById('interactionsPanel');
+            const qaList = document.getElementById('qaList');
+            interactionsPanel.classList.remove('hidden');
+            qaList.innerHTML = '';
+            
+            qa.forEach(pair => {
+                const item = document.createElement('div');
+                item.className = "bg-white/5 border border-outline/10 rounded p-3";
+                item.innerHTML = `
+                    <p class="text-[8px] text-[#00FF9C] font-technical-code uppercase mb-1">PROMPT_QUERY:</p>
+                    <p class="text-[11px] text-white italic mb-2">"${pair.q}"</p>
+                    <p class="text-[8px] text-on-surface-variant font-technical-code uppercase mb-1">USER_RESPONSE:</p>
+                    <p class="text-[11px] text-[#00FF9C] font-bold">"${pair.a}"</p>
+                `;
+                qaList.appendChild(item);
+            });
+        }
+
+        // --- RADAR CHART ---
+        const ctx = document.getElementById('sentimentChart').getContext('2d');
+        let labels = [];
+        let chartData = [];
+        
+        if (enrichedSongs.length > 0) {
+            const emotionSet = new Set();
+            enrichedSongs.forEach(s => {
+                Object.keys(s.emotions || {}).forEach(emo => {
+                    emotionSet.add(getReadableEmotion(emo));
+                });
+            });
+            labels = Array.from(emotionSet).map(e => e.charAt(0).toUpperCase() + e.slice(1)).sort();
+            const keyMap = {};
+            labels.forEach((label, idx) => { keyMap[label.toLowerCase()] = idx; });
+            chartData = new Array(labels.length).fill(0);
+            enrichedSongs.forEach(s => {
+                Object.entries(s.emotions || {}).forEach(([emo, val]) => {
+                    const readable = getReadableEmotion(emo);
+                    const idx = keyMap[readable.toLowerCase()];
+                    if (idx !== undefined) chartData[idx] += val;
+                });
+            });
+            for (let i = 0; i < chartData.length; i++) {
+                chartData[i] = Math.min((chartData[i] / enrichedSongs.length) * 100, 100);
+            }
+        } else {
+            labels = ['Sadness', 'Anger', 'Joy', 'Love', 'Neutral', 'Fear'];
+            chartData = labels.map(() => Math.random() * 40 + 30);
+        }
+
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: 'rgba(0, 255, 156, 0.1)',
+                    borderColor: '#00FF9C',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#00FF9C',
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(255, 255, 255, 0.05)' },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        pointLabels: { color: '#00FF9C', font: { size: 9, family: 'Space Mono' } },
+                        ticks: { display: false },
+                        suggestedMin: 0, suggestedMax: 100
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // --- TRACKS GRID ---
+        const carousel = document.getElementById('albumCarousel');
+        carousel.innerHTML = '';
+        enrichedSongs.forEach((song, idx) => {
+            const div = document.createElement('div');
+            div.className = "aspect-square rounded border border-outline/20 overflow-hidden hover:border-[#00FF9C]/50 cursor-pointer transition-all opacity-40 hover:opacity-100 group";
+            div.onclick = () => selectAlbum(song, div);
+            div.innerHTML = `<img src="${song.image || 'https://placehold.co/128'}" alt="art" class="w-full h-full object-cover transition-transform group-hover:scale-110">`;
+            carousel.appendChild(div);
+        });
+
+        function selectAlbum(song, el) {
+            document.querySelectorAll('#albumCarousel > div').forEach(d => {
+                d.classList.remove('opacity-100', 'border-[#00FF9C]', 'ring-1', 'ring-[#00FF9C]/30');
+                d.classList.add('opacity-40', 'border-outline/20');
+            });
+            el.classList.remove('opacity-40', 'border-outline/20');
+            el.classList.add('opacity-100', 'border-[#00FF9C]', 'ring-1', 'ring-[#00FF9C]/30');
+
+            document.getElementById('dossierImg').src = song.image || 'https://placehold.co/128';
+            document.getElementById('dossierTitle').textContent = song.title;
+            document.getElementById('dossierArtist').textContent = song.artist;
+            document.getElementById('dossierRoast').textContent = song.roast || "The AI is still processing this decision.";
+            
+            const genres = document.getElementById('dossierGenres');
+            genres.innerHTML = '';
+            Object.entries(song.emotions || {}).sort((a,b) => b[1]-a[1]).slice(0, 3).forEach(([emo, val]) => {
+                const span = document.createElement('span');
+                span.className = "px-3 py-1 bg-[#00FF9C]/10 border border-[#00FF9C]/20 text-[#00FF9C] text-[9px] uppercase font-bold tracking-widest rounded";
+                span.textContent = getReadableEmotion(emo);
+                genres.appendChild(span);
+            });
+
+            const bars = document.getElementById('emotionBars');
+            bars.innerHTML = '';
+            const topEmotions = Object.entries(song.emotions || {}).sort((a,b) => b[1]-a[1]).slice(0, 3);
+            let intensitySum = 0;
+            topEmotions.forEach(([emo, val], i) => {
+                const percent = (val * 100).toFixed(0);
+                intensitySum += val;
+                const row = document.createElement('div');
+                row.className = "space-y-1";
+                row.innerHTML = `
+                    <div class="flex justify-between text-[10px] font-technical-code">
+                        <span class="text-on-surface-variant uppercase">${getReadableEmotion(emo)}</span>
+                        <span class="text-white">${percent}%</span>
+                    </div>
+                    <div class="h-1 bg-[#00FF9C]/5 rounded-full overflow-hidden">
+                        <div class="h-full bg-[#00FF9C] rounded-full transition-all duration-1000" style="width: ${percent}%"></div>
+                    </div>
+                `;
+                bars.appendChild(row);
+            });
+
+            const finalIntensity = Math.min(Math.round((intensitySum / 1.2) * 100), 100);
+            const meter = document.getElementById('intensityMeter');
+            meter.style.strokeDashoffset = 283 - (283 * (finalIntensity / 100));
+            document.getElementById('intensityValue').textContent = finalIntensity;
+        }
+
+        if (enrichedSongs.length > 0) selectAlbum(enrichedSongs[0], carousel.firstChild);
+
+        // --- EXPORT ---
+        window.exportDashboard = async () => {
+            const btn = document.querySelector('button[onclick*="exportDashboard"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'GENERATING...';
+            try {
+                const canvas = await html2canvas(document.querySelector('main'), {
+                    backgroundColor: '#08120E', scale: 2, useCORS: true
+                });
+                const link = document.createElement('a');
+                link.download = `CRITIC_OS_Report_${user.name}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                btn.innerHTML = 'EXPORTED';
+            } catch (err) {
+                btn.innerHTML = 'ERROR';
+            }
+            setTimeout(() => { btn.innerHTML = originalText; }, 3000);
+        };
+    });
+</script>
+</body>
+</html>
