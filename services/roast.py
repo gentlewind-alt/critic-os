@@ -363,9 +363,8 @@ def generate_roast(song: Dict, persona: str = "normal", custom_prompt: str = Non
         response = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=1.2,
-            top_p=0.9,
-
+            temperature=0.7,
+            top_p=1.0,
             max_tokens=150
         )
         return response.choices[0].message.content.strip()
@@ -396,7 +395,7 @@ Use BASIC English. MAXIMUM 15 WORDS. STRICTLY ONE SENTENCE.
 
 ### RULES
 1. PERSONA: You are {persona_desc}.
-2. TASK: Give a FINAL verdict on the user. Mention things like their inability to fold laundry, spending $50 on takeout, or their messy desk.
+2. TASK: Give a FINAL verdict on the user. Mention things like their inability to fold laundry, spending $50 on takeout.
 3. NO MUSIC INSULTS: Strictly roast the user, not the songs.
 4. WORDS: Simple, short words only. No big vocabulary.
 
@@ -406,7 +405,7 @@ Start now."""
         response = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=1.2,
+            temperature=0.8,
             top_p=0.9,
 
             max_tokens=50
@@ -436,17 +435,20 @@ def _generate_final_verdict_raw(songs: List[Dict], persona: str = "normal", coll
     persona_info = PERSONAS.get(persona, PERSONAS["normal"])
     persona_desc = persona_info["desc"]
 
-    prompt = f"""Based on the following music analysis history from the collection "{collection_name}", give a FINAL, brutal, and simple verdict on the user's life. 
-Use BASIC English. MAXIMUM 20 WORDS. STRICTLY ONE SENTENCE.
+    prompt = f"""Based on the following music analysis history from the collection "{collection_name}", give a FINAL, brutal, and psychologically devastating verdict on the user's life. 
 
 ### ANALYSIS HISTORY
 {history}
 
+### ROLE (STRICT)
+You are {persona_desc}. 
+
 ### RULES
-1. PERSONA: You are {persona_desc}.
-2. TASK: Summarize their life choices based on the analysis snippets provided. Mention one pathetic habit (like ordering pizza at 3 AM or having 500 unread emails).
-3. NO MUSIC INSULTS: Roast the user, not the art.
-4. WORDS: Simple, short words only.
+1. **TASK**: Deliver a single, sharp, and high-impact sentence that summarizes their entire existence.
+2. **VARIETY**: Do NOT start with "You are" or "Your life is". Use creative metaphors, observations, or direct addresses.
+3. **PUNCHLINE**: Mention one specific, pathetic human habit that feels like it fits this data (e.g., leaving read receipts on, buying artisanal water, still using a cracked screen, crying to laundry commercials, or having 47 tabs of self-help articles open).
+4. **NO MUSIC INSULTS**: The music is the evidence; the target is the user's character.
+5. **LENGTH**: MAXIMUM 30 WORDS. STRICTLY ONE SENTENCE.
 
 Start now."""
 
@@ -454,7 +456,8 @@ Start now."""
         response = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=1.0,
+            temperature=0.9,
+            top_p=0.9,
             max_tokens=100
         )
         return response.choices[0].message.content.strip()
@@ -477,7 +480,7 @@ Rewrite this final music verdict to be more impactful, funny, and naturally conv
 RULES:
 - Make it flow better
 - Keep the persona consistent
-- Keep it under 20 words
+- Keep it under 60 words
 - STRICTLY ONE SENTENCE
 - DO NOT ask any questions or use question marks.
 

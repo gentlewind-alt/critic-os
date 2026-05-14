@@ -287,25 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =======================
 // DEV TOOLS
 // =======================
-const resetBtn = document.getElementById('resetBtn');
-const tuneBtn = document.getElementById('tuneBtn');
-const tuneProfileBtn = document.getElementById('tuneProfileBtn');
-const tuneModal = document.getElementById('tuneModal');
-const promptOverride = document.getElementById('promptOverride');
-const profilePromptOverride = document.getElementById('profilePromptOverride');
-const tuneModalTitle = document.getElementById('tuneModalTitle');
-const roastTuneArea = document.getElementById('roastTuneArea');
-const profileTuneArea = document.getElementById('profileTuneArea');
-
-resetBtn.onclick = () => {
-    if (confirm("RESET SESSION? All generation progress will be lost (songs are kept).")) {
-        sessionStorage.removeItem('os_events');
-        sessionStorage.removeItem('os_persona');
-        sessionStorage.removeItem('os_qa_pairs');
-        sessionStorage.removeItem('os_final_report');
-        window.location.reload();
-    }
-};
+// Load saved prompt if any
 
 function openTuneModal(type) {
     tuneModal.style.display = 'flex';

@@ -654,8 +654,9 @@
             `;
 
             // TRACK NAME
-            activeTrackName.textContent =
-                `${song.artist} - ${song.album || song.title}`;
+            if (activeTrackName) {
+                activeTrackName.textContent = `${song.artist || 'Unknown'} - ${song.title || 'Unknown'}`;
+            }
 
             // DOTS
             dotsContainer.innerHTML = "";
@@ -698,19 +699,25 @@
             renderSlider(currentAlbum);
         });
 
-        renderSlider(currentAlbum);
+        if (enrichedSongs && enrichedSongs.length > 0) {
+            renderSlider(currentAlbum);
+        }
 
         function selectAlbum(song) {
+            if (!song) return;
 
             document.getElementById('dossierImg').src = song.image || 'https://placehold.co/128';
-            document.getElementById('dossierTitle').textContent = song.title;
-            document.getElementById('dossierArtist').textContent = song.artist;
+            document.getElementById('dossierTitle').textContent = song.title || "Unknown Track";
+            document.getElementById('dossierArtist').textContent = song.artist || "Unknown Artist";
             document.getElementById('dossierRoast').textContent = song.roast || "The AI is still processing this decision.";
             document.getElementById('dossierEvidence').textContent = song.evidence || "[REDACTED] OR [NO LYRICS FOUND]";
             
             const genres = document.getElementById('dossierGenres');
             genres.innerHTML = '';
-            Object.entries(song.emotions || {}).sort((a,b) => b[1]-a[1]).slice(0, 3).forEach(([emo, val]) => {
+            
+            // Handle both mapped emotions and raw emotion labels
+            const songEmos = song.emotions || {};
+            Object.entries(songEmos).sort((a,b) => b[1]-a[1]).slice(0, 3).forEach(([emo, val]) => {
                 const span = document.createElement('span');
                 span.className = "px-3 py-1 bg-[#00FF9C]/10 border border-[#00FF9C]/20 text-[#00FF9C] text-[9px] uppercase font-bold tracking-widest rounded";
                 span.textContent = getReadableEmotion(emo);
@@ -719,7 +726,7 @@
 
             const bars = document.getElementById('emotionBars');
             bars.innerHTML = '';
-            const topEmotions = Object.entries(song.emotions || {}).sort((a,b) => b[1]-a[1]).slice(0, 3);
+            const topEmotions = Object.entries(songEmos).sort((a,b) => b[1]-a[1]).slice(0, 3);
             let intensitySum = 0;
             topEmotions.forEach(([emo, val], i) => {
                 const percent = (val * 100).toFixed(0);
@@ -738,7 +745,7 @@
                 bars.appendChild(row);
             });
 
-            const finalIntensity = Math.min(Math.round((intensitySum / 1.2) * 100), 100);
+            const finalIntensity = Math.min(Math.round((intensitySum / 1.0) * 100), 100);
             const meter = document.getElementById('intensityMeter');
             meter.style.strokeDashoffset = 283 - (283 * (finalIntensity / 100));
             document.getElementById('intensityValue').textContent = finalIntensity;
