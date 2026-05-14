@@ -5,6 +5,7 @@ import logging
 import csv
 import random
 import json
+import re
 from typing import Dict, List, Generator
 from groq import Groq
 
@@ -299,10 +300,13 @@ def generate_roast_stream(song: Dict, persona: str = "normal", custom_prompt: st
     # ISOLATE EVIDENCE (Don't let the LLM rewrite it)
     clean_raw = raw_text
     evidence_snippet = ""
-    if "||EVIDENCE:" in raw_text:
-        parts = raw_text.split("||EVIDENCE:")
+    
+    # Robust split for evidence
+    evidence_match = re.search(r"\|\|?\s*EVIDENCE:\s*(.*)", raw_text, re.IGNORECASE)
+    if evidence_match:
+        parts = re.split(r"\|\|?\s*EVIDENCE:", raw_text, flags=re.IGNORECASE)
         clean_raw = parts[0].strip()
-        evidence_snippet = "||EVIDENCE:" + parts[1]
+        evidence_snippet = evidence_match.group(1).replace("||", "").strip()
 
     # Step 2: Build the Editor Rewrite Prompt (Pass 2)
     # Ensure the rewrite phase knows about the grounding so it doesn't strip it.
@@ -340,11 +344,13 @@ Start immediately with the refined roast."""
         
         # APPEND EVIDENCE AT THE END OF THE STREAM
         if evidence_snippet:
-            yield f" {evidence_snippet}"
+            yield {"type": "evidence", "text": evidence_snippet}
                     
     except Exception as e:
         logger.error(f"Groq Rewrite Stream Error (Roast): {str(e)}")
-        yield f"{clean_raw} {evidence_snippet}" if evidence_snippet else clean_raw
+        yield clean_raw
+        if evidence_snippet:
+            yield {"type": "evidence", "text": evidence_snippet}
 
 
 # ==========================

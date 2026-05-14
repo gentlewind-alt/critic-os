@@ -188,18 +188,28 @@ def run_pipeline_optimized(enriched_songs: List[Dict], persona: str = "normal", 
             generator = generate_roast_stream(song, persona, custom_prompt, current_context)
 
         song_roast_chunks = []
+        song_evidence = ""
         try:
-            for token in generator:
-                song_roast_chunks.append(token)
-                yield {
-                    "type": "roast_token",
-                    "text": token,
-                    "index": i
-                }
+            for item in generator:
+                if isinstance(item, dict) and item.get("type") == "evidence":
+                    song_evidence = item["text"]
+                    yield {
+                        "type": "evidence",
+                        "text": song_evidence,
+                        "index": i
+                    }
+                else:
+                    song_roast_chunks.append(item)
+                    yield {
+                        "type": "roast_token",
+                        "text": item,
+                        "index": i
+                    }
         except Exception as e:
             yield { "type": "roast_token", "text": f"[AI Error: {str(e)}]", "index": i }
 
         song["roast"] = "".join(song_roast_chunks)
+        song["evidence"] = song_evidence
 
         yield {
             "type": "roast_end",

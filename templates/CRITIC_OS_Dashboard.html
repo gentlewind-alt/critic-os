@@ -179,18 +179,14 @@
 <!-- SideNavBar -->
 <nav class="bg-surface/70 backdrop-blur-xl h-screen w-72 flex flex-col fixed left-0 top-0 border-r border-outline/15 shadow-[inset_-10px_0_20px_rgba(255,255,255,0.02)] shadow-[0_0_30px_rgba(0,0,0,0.8)] z-40 hidden md:flex flex-col h-full justify-between">
     <div class="flex flex-col flex-grow">
-        <div class="p-6 border-b border-outline/15 mb-4">
+        <div class="p-6 border-b border-outline/15 mb-3">
             <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full border border-[#00FF9C]/30 flex items-center justify-center bg-[#00FF9C]/10 overflow-hidden relative">
-                    <span class="material-symbols-outlined text-[#00FF9C] absolute" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
-                </div>
                 <div>
                     <h1 class="font-headline-lg text-headline-lg font-bold tracking-tighter text-primary italic text-[24px]">CRITIC_OS</h1>
-                    <p class="font-technical-code text-label-sm text-[#00FF9C] tracking-widest mt-1">STATUS: JUDGING</p>
                 </div>
             </div>
             
-            <div class="mt-8 text-center flex flex-col items-center">
+            <div class="mt-2 text-center flex flex-col items-center">
                 <div class="relative w-28 h-28 rounded-full p-1 bg-gradient-to-b from-[#00FF9C] to-transparent shadow-lg">
                     <div class="w-full h-full rounded-full overflow-hidden border-4 border-[#08120E] bg-surface-dim">
                         <img id="userAvatar" src="https://placehold.co/128" alt="avatar" class="w-full h-full object-cover">
@@ -213,9 +209,9 @@
         </ul>
 
         <!-- ANALYZED TRACKS SLIDER -->
-        <div class="px-6 mt-6">
+        <div class="px-6 mt-1">
 
-            <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center justify-between">
 
                 <div>
                     <h3 class="text-[11px] text-white uppercase tracking-widest font-bold">
@@ -247,7 +243,7 @@
             </div>
 
             <!-- SLIDER -->
-            <div class="relative flex items-center justify-center mt-5 min-h-[250px]">
+            <div class="relative flex items-center justify-center mt-2">
 
                 <!-- LEFT PREVIEW -->
                 <div
@@ -272,17 +268,17 @@
 
             </div>
 
-            <!-- TRACK TITLE -->
+            <!-- TRACK TITLE
             <div class="mt-5 text-center">
 
                 <h4
-                    id="activeTrackName"
+                    id="activeTrackName"    
                     class="text-white text-[15px] leading-tight font-medium"
                 >
                     Imogen Heap - Speak for Yourself
                 </h4>
 
-            </div>
+            </div> -->
 
             <!-- PAGINATION -->
             <div
@@ -521,25 +517,34 @@
         let chartData = [];
         
         if (enrichedSongs.length > 0) {
-            const emotionSet = new Set();
-            enrichedSongs.forEach(s => {
-                Object.keys(s.emotions || {}).forEach(emo => {
-                    emotionSet.add(getReadableEmotion(emo));
-                });
-            });
-            labels = Array.from(emotionSet).map(e => e.charAt(0).toUpperCase() + e.slice(1)).sort();
-            const keyMap = {};
-            labels.forEach((label, idx) => { keyMap[label.toLowerCase()] = idx; });
-            chartData = new Array(labels.length).fill(0);
+            // 1. AGGREGATE EMOTIONS
+            const emotionTotals = {};
             enrichedSongs.forEach(s => {
                 Object.entries(s.emotions || {}).forEach(([emo, val]) => {
-                    const readable = getReadableEmotion(emo);
-                    const idx = keyMap[readable.toLowerCase()];
-                    if (idx !== undefined) chartData[idx] += val;
+                    const readable = getReadableEmotion(emo).toLowerCase();
+                    emotionTotals[readable] = (emotionTotals[readable] || 0) + val;
                 });
             });
-            for (let i = 0; i < chartData.length; i++) {
-                chartData[i] = Math.min((chartData[i] / enrichedSongs.length) * 100, 100);
+
+            // 2. PICK TOP 10 EMOTIONS TO AVOID CLUTTER
+            const sortedEmotions = Object.entries(emotionTotals)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            labels = sortedEmotions.map(([emo]) => emo.charAt(0).toUpperCase() + emo.slice(1));
+            
+            // 3. SCALE DATA (SQUARE ROOT + NORMALIZATION)
+            const rawValues = sortedEmotions.map(([_, total]) => total / enrichedSongs.length);
+            
+            // Apply square root to boost smaller values
+            chartData = rawValues.map(v => Math.sqrt(v));
+            
+            // Normalize so max is 100
+            const maxScaled = Math.max(...chartData);
+            if (maxScaled > 0) {
+                chartData = chartData.map(v => (v / maxScaled) * 100);
+            } else {
+                chartData = chartData.map(() => 0);
             }
         } else {
             labels = ['Sadness', 'Anger', 'Joy', 'Love', 'Neutral', 'Fear'];
@@ -556,19 +561,36 @@
                     borderColor: '#00FF9C',
                     borderWidth: 2,
                     pointBackgroundColor: '#00FF9C',
+                    pointRadius: 3,
                 }]
             },
             options: {
                 scales: {
                     r: {
-                        angleLines: { color: 'rgba(255, 255, 255, 0.05)' },
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        pointLabels: { color: '#00FF9C', font: { size: 9, family: 'Space Mono' } },
+                        angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        pointLabels: { 
+                            color: '#00FF9C', 
+                            font: { size: 10, family: 'Space Mono' },
+                            padding: 15
+                        },
                         ticks: { display: false },
-                        suggestedMin: 0, suggestedMax: 100
+                        suggestedMin: 0, 
+                        suggestedMax: 100
                     }
                 },
-                plugins: { legend: { display: false } }
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Intensity: ${Math.round(context.raw)}%`;
+                            }
+                        }
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false
             }
         });
 

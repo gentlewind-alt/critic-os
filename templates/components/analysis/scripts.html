@@ -740,6 +740,14 @@ async function handleEvent(event, isReplay = false) {
             confidenceText.textContent = (event.confidence * 100).toFixed(1) + '%';
             break;
 
+        case 'evidence':
+            const targetIndex = (event.index !== undefined) ? event.index : lastRoastIndex + 1;
+            const eSong = enrichedSongs[targetIndex];
+            if (eSong) {
+                eSong.evidence = event.text;
+            }
+            break;
+
         case 'roast_start':
             const songData = enrichedSongs[event.index];
             let songImg = null;
@@ -844,19 +852,8 @@ async function handleEvent(event, isReplay = false) {
                     const dBody = document.getElementById('activeRoastDisplay');
                     const fullText = dBody.querySelector('.text-content').textContent;
                     
-                    let cleanRoast = fullText;
-                    let evidence = "";
-                    if (fullText.includes("||EVIDENCE:")) {
-                        const parts = fullText.split("||EVIDENCE:");
-                        cleanRoast = parts[0].trim();
-                        evidence = parts[1].replace(/\|\|/g, "").trim();
-                        // Update display to be clean
-                        dBody.querySelector('.text-content').textContent = cleanRoast;
-                    }
-                    
                     if (song) {
-                        song.roast = cleanRoast;
-                        song.evidence = evidence;
+                        song.roast = fullText;
                         sessionStorage.setItem('enrichedSongs', JSON.stringify(enrichedSongs));
                     }
 
@@ -864,8 +861,8 @@ async function handleEvent(event, isReplay = false) {
                         track: song ? song.track_name : 'Unknown',
                         artist: song ? song.artist_name : 'Unknown',
                         image: song ? song.album_image : 'https://placehold.co/300',
-                        roast: cleanRoast,
-                        evidence: evidence
+                        roast: fullText,
+                        evidence: song ? song.evidence : ""
                     };
 
                     dBody.classList.add('fade-out');

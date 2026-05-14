@@ -103,8 +103,11 @@ def stream_answer():
     def event_stream():
         try:
             # We pass interaction_state to ground the roast
-            for token in generate_roast_stream(song, persona, custom_prompt, interaction_state):
-                yield f"data: {json.dumps({'type': 'roast_token', 'text': token})}\n\n"
+            for item in generate_roast_stream(song, persona, custom_prompt, interaction_state):
+                if isinstance(item, dict) and item.get("type") == "evidence":
+                    yield f"data: {json.dumps({'type': 'evidence', 'text': item['text']})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'roast_token', 'text': item})}\n\n"
             yield f"data: {json.dumps({'type': 'roast_end'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type':'error','msg':str(e)})}\n\n"
