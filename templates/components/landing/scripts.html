@@ -16,6 +16,10 @@ async function checkAuth() {
             btn.textContent = "[ LOGIN TO SPOTIFY ]";
             if (logoutBtn) logoutBtn.style.display = 'none';
             btn.onclick = () => {
+                // Track login button click
+                if (typeof window.trackEvent === 'function') {
+                    window.trackEvent('login_clicked', { page: 'landing' });
+                }
                 window.location.href = "/login";
             };
         } else {
@@ -87,6 +91,10 @@ function addLog(msg, type = 'info') {
 
 async function startAnalysis() {
     if (isRunning) return;
+    // Track analysis start
+    if (typeof window.trackEvent === 'function') {
+        window.trackEvent('analysis_started', { page: 'landing' });
+    }
     openCollectionSelector();
 }
 
@@ -181,6 +189,14 @@ function closeCollectionSelector() {
 async function selectCollection(id, name) {
     if (isRunning) return;
     isRunning = true;
+    
+    // Track collection selection
+    if (typeof window.trackEvent === 'function') {
+        window.trackEvent('collection_selected', { 
+            collection_id: id === 'liked' ? 'liked_songs' : 'playlist',
+            collection_name: name 
+        });
+    }
     
     if (collectionTitle) collectionTitle.textContent = '// PROCESSING_COLLECTION';
     collectionList.style.display = 'none';
