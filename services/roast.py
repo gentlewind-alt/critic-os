@@ -118,18 +118,21 @@ DO NOT mention its specific topics (e.g., specific objects, people, or scenarios
     if custom_prompt:
         base_instructions = custom_prompt
     elif not lyrics_found:
-        base_instructions = f"The lyrics for this song are missing (it might be an instrumental track). Sardonically roast the user for listening to such an obscure or wordless track. Use SIMPLE English. MAXIMUM 40 WORDS."
+        base_instructions = f"The lyrics for this song are missing (it might be an instrumental track). Sardonically roast the user for listening to such an obscure or wordless track. Use SIMPLE English. MAXIMUM 40 WORDS. DO NOT ask any questions. Reference the detected vibe ({emotions_str}) specifically."
     else:
-        base_instructions = """Analyze the user's vibe based on this song. 
+        base_instructions = f"""Analyze the user's vibe based on this song. 
         CRITICAL RULES:
         1. MUST reference or twist at least one lyric.
         2. MUST reuse 2-5 exact words from the lyrics.
         3. Be conversational, informal, and highly aggressive.
         4. Use biting insults. Avoid generic words like 'garbage' or 'trash'.
-        5. Use SIMPLE English. MAXIMUM 40 WORDS."""
+        5. Use SIMPLE English. MAXIMUM 40 WORDS.
+        6. DO NOT ask any questions.
+        7. USE the specific detected emotions ({emotions_str}) in your roast. Stop using 'melancholic' unless it is explicitly in the list.
+        8. AT THE VERY END, append the EXACT lyric snippet you referenced using this format: ||EVIDENCE: "exact lyrics"||"""
 
     # Grounding instructions if interaction exists
-    grounding = f"\n### USER PSYCHOLOGY (HIGH PRIORITY)\nThe user {interaction_state}. Use this to influence the confidence and aggressive framing of your roast. If they confirmed, double down on the insult. If they denied, sardonically mock their lack of self-awareness." if interaction_state else ""
+    grounding = f"\n### USER PSYCHOLOGY (HIGH PRIORITY)\nThe user {interaction_state}. Use this to influence the confidence and aggressive framing of your roast. If they confirmed, double down on the insult. If they denied, sardonically mock their lack of self-awareness. DO NOT ask any questions. Use their detected emotions ({emotions_str}) to roast them." if interaction_state else ""
 
     metadata_context = f"Vibe: {emotions_str}"
     lyrics_section = f"### LYRICS\n{lyrics}" if lyrics_found else "### LYRICS\n[LYRICS NOT FOUND: SONG TOO OBSCURE]"
@@ -195,10 +198,10 @@ def build_profile_prompt(songs: List[Dict], persona: str = "normal", custom_prom
     # Use custom prompt if provided, otherwise use default savage profile template
     base_instructions = custom_prompt if custom_prompt else f"""Analyze this user's overall music taste with a sharp, judgmental tone. 
 Briefly mention artists like {', '.join(top_artists)} and detect their emotional patterns ({', '.join(unique_emotions)}).
-Use SIMPLE English. MAXIMUM 40 WORDS."""
+Use SIMPLE English. MAXIMUM 40 WORDS. DO NOT ask any questions."""
 
     # Grounding instructions if interaction exists
-    grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state}. You MUST weave this into the profile analysis naturally." if interaction_state else ""
+    grounding = f"\n### GROUNDING (HIGH PRIORITY)\nThe user {interaction_state}. You MUST weave this into the profile analysis naturally. DO NOT ask any questions." if interaction_state else ""
 
     return f"""{base_instructions}{grounding}
 
@@ -256,6 +259,7 @@ RULES:
 - keep meaning the same{grounding_reminder}
 - make it sound human and direct
 - MAXIMUM 40 WORDS. 2-3 sentences.
+- DO NOT ask any questions or use question marks.
 
 TEXT:
 "{raw_text}"
@@ -292,6 +296,14 @@ def generate_roast_stream(song: Dict, persona: str = "normal", custom_prompt: st
     # Step 1: Get the raw draft in the background (Pass 1)
     raw_text = _generate_roast_raw(song, persona, custom_prompt, interaction_state)
     
+    # ISOLATE EVIDENCE (Don't let the LLM rewrite it)
+    clean_raw = raw_text
+    evidence_snippet = ""
+    if "||EVIDENCE:" in raw_text:
+        parts = raw_text.split("||EVIDENCE:")
+        clean_raw = parts[0].strip()
+        evidence_snippet = "||EVIDENCE:" + parts[1]
+
     # Step 2: Build the Editor Rewrite Prompt (Pass 2)
     # Ensure the rewrite phase knows about the grounding so it doesn't strip it.
     grounding_reminder = f"\n- MANDATORY: Incorporate the meaning of the user's previous response ({interaction_state}) naturally into the text." if interaction_state else ""
@@ -305,9 +317,10 @@ RULES:
 - keep meaning the same{grounding_reminder}
 - make it sound human
 - MAXIMUM 40 WORDS. 2-3 sentences.
+- DO NOT ask any questions or use question marks.
 
 TEXT:
-"{raw_text}"
+"{clean_raw}"
 
 Start immediately with the refined roast."""
 
@@ -324,10 +337,14 @@ Start immediately with the refined roast."""
             content = chunk.choices[0].delta.content
             if content:
                 yield content
+        
+        # APPEND EVIDENCE AT THE END OF THE STREAM
+        if evidence_snippet:
+            yield f" {evidence_snippet}"
                     
     except Exception as e:
         logger.error(f"Groq Rewrite Stream Error (Roast): {str(e)}")
-        yield f"[REWRITE ERROR: {str(e)}]"
+        yield f"{clean_raw} {evidence_snippet}" if evidence_snippet else clean_raw
 
 
 # ==========================
@@ -456,6 +473,7 @@ RULES:
 - Keep the persona consistent
 - Keep it under 20 words
 - STRICTLY ONE SENTENCE
+- DO NOT ask any questions or use question marks.
 
 TEXT:
 "{raw_verdict}"

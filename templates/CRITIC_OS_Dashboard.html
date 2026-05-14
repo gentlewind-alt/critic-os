@@ -204,20 +204,93 @@
             </div>
         </div>
         
-        <ul class="flex flex-col font-technical-code text-technical-code uppercase tracking-widest flex-grow px-2">
+        <ul class="flex flex-col font-technical-code text-technical-code tracking-widest flex-grow px-2">
             <li class="w-full mb-1">
                 <a class="text-primary bg-primary/10 border-r-2 border-[#00FF9C] py-3 px-4 flex items-center gap-3 w-full hover:bg-primary/5 transition-all" href="#">
-                    <span class="material-symbols-outlined">grid_view</span>
                     DASHBOARD
                 </a>
             </li>
         </ul>
 
-        <div class="p-6 mt-auto">
-            <h3 class="text-[10px] text-[#00FF9C] uppercase tracking-widest font-bold mb-4">ANALYZED_TRACKS</h3>
-            <div id="albumCarousel" class="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto no-scrollbar pr-1">
-                <!-- Tracks Grid -->
+        <!-- ANALYZED TRACKS SLIDER -->
+        <div class="px-6 mt-6">
+
+            <div class="flex items-center justify-between mb-3">
+
+                <div>
+                    <h3 class="text-[11px] text-white uppercase tracking-widest font-bold">
+                        ANALYZED TRACKS
+                    </h3>
+                </div>
+
+                <!-- OPTIONAL NAV -->
+                <div class="flex gap-1">
+                    <button
+                        id="albumPrev"
+                        class="w-7 h-7 rounded border border-[#00FF9C]/10 hover:border-[#00FF9C]/40 hover:bg-[#00FF9C]/5 transition-all flex items-center justify-center p-1"
+                    >
+                        <svg class="w-full h-full text-[#00FF9C]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20.6621 17C18.933 19.989 15.7013 22 11.9999 22C6.47703 22 1.99988 17.5228 1.99988 12C1.99988 6.47715 6.47703 2 11.9999 2C15.7013 2 18.933 4.01099 20.6621 7M11.9999 8L7.99995 12M7.99995 12L11.9999 16M7.99995 12H21.9999" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <button
+                        id="albumNext"
+                        class="w-7 h-7 rounded border border-[#00FF9C]/10 hover:border-[#00FF9C]/40 hover:bg-[#00FF9C]/5 transition-all flex items-center justify-center p-1"
+                    >
+                        <svg class="w-full h-full text-[#00FF9C]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3.33789 7C5.06694 4.01099 8.29866 2 12.0001 2C17.5229 2 22.0001 6.47715 22.0001 12C22.0001 17.5228 17.5229 22 12.0001 22C8.29866 22 5.06694 19.989 3.33789 17M12 16L16 12M16 12L12 8M16 12H2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+
             </div>
+
+            <!-- SLIDER -->
+            <div class="relative flex items-center justify-center mt-5 min-h-[250px]">
+
+                <!-- LEFT PREVIEW -->
+                <div
+                    id="leftPreview"
+                    class="absolute left-0 w-[60px] h-[110px] rounded-lg overflow-hidden opacity-20 scale-90 blur-[0.3px] transition-all duration-500"
+                >
+                </div>
+
+                <!-- CENTER ACTIVE -->
+                <div
+                    id="albumCarousel"
+                    class="relative z-10 w-[140px] transition-all duration-500"
+                >
+                </div>
+
+                <!-- RIGHT PREVIEW -->
+                <div
+                    id="rightPreview"
+                    class="absolute right-0 w-[60px] h-[110px] rounded-lg overflow-hidden opacity-20 scale-90 blur-[0.3px] transition-all duration-500"
+                >
+                </div>
+
+            </div>
+
+            <!-- TRACK TITLE -->
+            <div class="mt-5 text-center">
+
+                <h4
+                    id="activeTrackName"
+                    class="text-white text-[15px] leading-tight font-medium"
+                >
+                    Imogen Heap - Speak for Yourself
+                </h4>
+
+            </div>
+
+            <!-- PAGINATION -->
+            <div
+                id="albumDots"
+                class="flex items-center justify-center gap-2 mt-5"
+            >
+            </div>
+
         </div>
     </div>
     <div class="p-6 border-t border-outline/15 text-[10px] text-on-surface-variant/50 font-technical-code">
@@ -231,15 +304,6 @@
     <header class="bg-surface-container-low/80 backdrop-blur-lg border-b border-outline/15 flex justify-between items-center px-6 py-3 w-full z-30 flex-shrink-0">
         <div class="flex items-center gap-4">
             <div class="font-headline-lg text-headline-lg font-bold text-primary tracking-tight text-[16px]">ANALYST_REPORT // LIVE_FEED</div>
-        </div>
-        <div class="flex items-center gap-4">
-            <button onclick="exportDashboard()" class="flex items-center gap-2 px-3 py-1.5 rounded border border-[#00FF9C]/30 text-[#00FF9C] font-technical-code text-[10px] font-bold hover:bg-[#00FF9C]/10 transition-all">
-                <span class="material-symbols-outlined text-xs">share</span>
-                EXPORT
-            </button>
-            <div class="w-7 h-7 border border-outline/30 rounded flex items-center justify-center bg-surface-dim overflow-hidden">
-                <span class="material-symbols-outlined text-on-surface-variant text-sm">person</span>
-            </div>
         </div>
     </header>
 
@@ -257,10 +321,8 @@
                         PATTERN: SCANNING...
                     </span>
                 </div>
-                <h2 class="text-3xl md:text-4xl font-bold text-white uppercase tracking-tighter leading-tight">
-                    You don't just listen to music. <br/>
-                    <span id="summaryPunchline" class="text-on-surface-variant">You relive situationships.</span>
-                    <span class="cursor-blink"></span>
+                <h2 id="dynamicHeadline" class="text-3xl md:text-4xl font-bold text-white uppercase tracking-tighter leading-tight">
+                    ANALYZING BEHAVIORAL PATTERNS...
                 </h2>
             </div>
 
@@ -318,8 +380,17 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="text-[9px] text-on-surface-variant uppercase tracking-widest mb-2">AI_OBSERVATION</h4>
-                                    <div class="bg-[#00FF9C]/5 border border-[#00FF9C]/10 rounded p-3 italic text-xs text-zinc-300 leading-relaxed relative">
+                                    <div class="bg-[#00FF9C]/5 border border-[#00FF9C]/10 rounded p-3 italic text-xs text-zinc-300 leading-relaxed relative mb-4">
                                         <p id="dossierRoast">Scanning track for vulnerabilities...</p>
+                                    </div>
+
+                                    <h4 class="text-[9px] text-[#FF4B4B] uppercase tracking-widest mb-2 flex items-center gap-1 cursor-help" title="The specific lyrics the AI flagged as evidence for this roast.">
+                                        <span class="material-symbols-outlined text-[10px]">gavel</span>
+                                        INCRIMINATING_EVIDENCE
+                                    </h4>
+                                    <div class="bg-[#FF4B4B]/5 border border-[#FF4B4B]/20 rounded p-3 font-technical-code text-[10px] text-zinc-400 leading-relaxed relative overflow-hidden">
+                                        <div class="absolute top-0 right-0 px-1 bg-[#FF4B4B]/20 text-[#FF4B4B] text-[8px]">REDACTED</div>
+                                        <p id="dossierEvidence" class="relative z-10">Waiting for evidence...</p>
                                     </div>
                                 </div>
                                 
@@ -408,11 +479,15 @@
         document.getElementById('memberSince').textContent = user.memberSince;
 
         // --- SUMMARY & VERDICT ---
+        if (user.behavioralAnalysis) {
+            document.getElementById('dynamicHeadline').textContent = user.behavioralAnalysis;
+        } else {
+            document.getElementById('dynamicHeadline').innerHTML = `You don't just listen to music. <br/> <span class="text-on-surface-variant">${stats.punchline || "You relive situationships."}</span>`;
+        }
+
         if (user.finalVerdict) {
             document.getElementById('finalVerdict').textContent = user.finalVerdict;
         }
-        const dynamicPunchline = stats.punchline || "The AI is still processing your questionable choices.";
-        document.getElementById('summaryPunchline').textContent = dynamicPunchline;
 
         if (stats.pattern) {
             const patternEl = document.getElementById('behavioralPattern');
@@ -497,29 +572,119 @@
             }
         });
 
-        // --- TRACKS GRID ---
-        const carousel = document.getElementById('albumCarousel');
-        carousel.innerHTML = '';
-        enrichedSongs.forEach((song, idx) => {
-            const div = document.createElement('div');
-            div.className = "aspect-square rounded border border-outline/20 overflow-hidden hover:border-[#00FF9C]/50 cursor-pointer transition-all opacity-40 hover:opacity-100 group";
-            div.onclick = () => selectAlbum(song, div);
-            div.innerHTML = `<img src="${song.image || 'https://placehold.co/128'}" alt="art" class="w-full h-full object-cover transition-transform group-hover:scale-110">`;
-            carousel.appendChild(div);
+        // --- ALBUM SLIDER ---
+        const carousel = document.getElementById("albumCarousel");
+        const leftPreview = document.getElementById("leftPreview");
+        const rightPreview = document.getElementById("rightPreview");
+        const dotsContainer = document.getElementById("albumDots");
+        const activeTrackName = document.getElementById("activeTrackName");
+
+        let currentAlbum = 0;
+
+        function renderSlider(index) {
+
+            const song = enrichedSongs[index];
+
+            // CENTER CARD
+            carousel.innerHTML = `
+                <div
+                    class="
+                    relative
+                    w-[140px]
+                    h-[190px]
+                    rounded-2xl
+                    overflow-hidden
+                    border border-[#00FF9C]
+                    shadow-[0_0_30px_rgba(0,255,156,0.45)]
+                    "
+                >
+                    <img
+                        src="${song.image}"
+                        class="w-full h-full object-cover"
+                    />
+                </div>
+            `;
+
+            // LEFT PREVIEW
+            const prev =
+                enrichedSongs[
+                    (index - 1 + enrichedSongs.length) % enrichedSongs.length
+                ];
+
+            leftPreview.innerHTML = `
+                <img
+                    src="${prev.image}"
+                    class="w-full h-full object-cover"
+                />
+            `;
+
+            // RIGHT PREVIEW
+            const next =
+                enrichedSongs[
+                    (index + 1) % enrichedSongs.length
+                ];
+
+            rightPreview.innerHTML = `
+                <img
+                    src="${next.image}"
+                    class="w-full h-full object-cover"
+                />
+            `;
+
+            // TRACK NAME
+            activeTrackName.textContent =
+                `${song.artist} - ${song.album || song.title}`;
+
+            // DOTS
+            dotsContainer.innerHTML = "";
+
+            enrichedSongs.forEach((_, i) => {
+
+                const dot = document.createElement("div");
+
+                dot.className =
+                    i === index
+                    ? "w-2.5 h-2.5 rounded-full bg-[#00FF9C] shadow-[0_0_10px_rgba(0,255,156,0.8)]"
+                    : "w-2 h-2 rounded-full bg-white/20";
+
+                dotsContainer.appendChild(dot);
+            });
+
+            // UPDATE DOSSIER
+            selectAlbum(song);
+        }
+
+        document
+        .getElementById("albumPrev")
+        .addEventListener("click", () => {
+
+            currentAlbum =
+                (currentAlbum - 1 + enrichedSongs.length)
+                % enrichedSongs.length;
+
+            renderSlider(currentAlbum);
         });
 
-        function selectAlbum(song, el) {
-            document.querySelectorAll('#albumCarousel > div').forEach(d => {
-                d.classList.remove('opacity-100', 'border-[#00FF9C]', 'ring-1', 'ring-[#00FF9C]/30');
-                d.classList.add('opacity-40', 'border-outline/20');
-            });
-            el.classList.remove('opacity-40', 'border-outline/20');
-            el.classList.add('opacity-100', 'border-[#00FF9C]', 'ring-1', 'ring-[#00FF9C]/30');
+        document
+        .getElementById("albumNext")
+        .addEventListener("click", () => {
+
+            currentAlbum =
+                (currentAlbum + 1)
+                % enrichedSongs.length;
+
+            renderSlider(currentAlbum);
+        });
+
+        renderSlider(currentAlbum);
+
+        function selectAlbum(song) {
 
             document.getElementById('dossierImg').src = song.image || 'https://placehold.co/128';
             document.getElementById('dossierTitle').textContent = song.title;
             document.getElementById('dossierArtist').textContent = song.artist;
             document.getElementById('dossierRoast').textContent = song.roast || "The AI is still processing this decision.";
+            document.getElementById('dossierEvidence').textContent = song.evidence || "[REDACTED] OR [NO LYRICS FOUND]";
             
             const genres = document.getElementById('dossierGenres');
             genres.innerHTML = '';
@@ -556,8 +721,6 @@
             meter.style.strokeDashoffset = 283 - (283 * (finalIntensity / 100));
             document.getElementById('intensityValue').textContent = finalIntensity;
         }
-
-        if (enrichedSongs.length > 0) selectAlbum(enrichedSongs[0], carousel.firstChild);
 
         // --- EXPORT ---
         window.exportDashboard = async () => {

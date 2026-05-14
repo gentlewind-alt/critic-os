@@ -844,8 +844,19 @@ async function handleEvent(event, isReplay = false) {
                     const dBody = document.getElementById('activeRoastDisplay');
                     const fullText = dBody.querySelector('.text-content').textContent;
                     
+                    let cleanRoast = fullText;
+                    let evidence = "";
+                    if (fullText.includes("||EVIDENCE:")) {
+                        const parts = fullText.split("||EVIDENCE:");
+                        cleanRoast = parts[0].trim();
+                        evidence = parts[1].replace(/\|\|/g, "").trim();
+                        // Update display to be clean
+                        dBody.querySelector('.text-content').textContent = cleanRoast;
+                    }
+                    
                     if (song) {
-                        song.roast = fullText;
+                        song.roast = cleanRoast;
+                        song.evidence = evidence;
                         sessionStorage.setItem('enrichedSongs', JSON.stringify(enrichedSongs));
                     }
 
@@ -853,7 +864,8 @@ async function handleEvent(event, isReplay = false) {
                         track: song ? song.track_name : 'Unknown',
                         artist: song ? song.artist_name : 'Unknown',
                         image: song ? song.album_image : 'https://placehold.co/300',
-                        roast: fullText
+                        roast: cleanRoast,
+                        evidence: evidence
                     };
 
                     dBody.classList.add('fade-out');
@@ -926,6 +938,9 @@ async function handleEvent(event, isReplay = false) {
                 const lastFinalMsg = finalMsgs[finalMsgs.length - 1];
                 const finalVerdict = lastFinalMsg ? lastFinalMsg.textContent : "";
                 
+                const profileOutput = document.getElementById('profileOutput');
+                const behavioralAnalysis = profileOutput ? profileOutput.textContent : "";
+
                 const qaPairs = JSON.parse(sessionStorage.getItem('os_qa_pairs') || '[]');
                 const userName = sessionStorage.getItem('userName') || 'USER';
                 const userImage = sessionStorage.getItem('userImage') || '';
@@ -950,7 +965,8 @@ async function handleEvent(event, isReplay = false) {
                         name: userName,
                         avatar: userImage,
                         memberSince: new Date().toLocaleDateString('default', { month: 'long', year: 'numeric' }),
-                        finalVerdict: finalVerdict
+                        finalVerdict: finalVerdict,
+                        behavioralAnalysis: behavioralAnalysis
                     },
                     stats: {
                         brutality: Math.floor(Math.random() * 20) + 75,
@@ -974,6 +990,7 @@ async function handleEvent(event, isReplay = false) {
                             artist: s.artist_name,
                             image: s.album_image,
                             roast: s.roast || "",
+                            evidence: s.evidence || "",
                             emotions: songEmos
                         };
                     })
