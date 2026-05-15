@@ -4,8 +4,9 @@ import hashlib
 from services.cache import cache_get, cache_set
 import os
 import logging
+import time
 import requests
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 try:
     from transformers import pipeline
@@ -13,51 +14,59 @@ except ImportError:
     pipeline = None
 
 logger = logging.getLogger(__name__)
-
+    
 # ==========================
 # CONFIG
 # ==========================
-# Local model path: ../emotion_model (Relative to workspace root)
-MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "emotion_model"))
-API_URL = os.getenv("HF_INFERENCE_URL", "https://api-inference.huggingface.co/models/samarthruckstar/emotion_label_model")
+MODEL_ID = os.getenv("EMOTION_MODEL_ID", "samarthruckstar/emotion_label_model")
+API_URL = os.getenv("HF_INFERENCE_URL", ".")
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+THRESHOLD = 0.1
 
+# ==========================
+# MODEL INITIALIZATION
+# ==========================
 _emotion_pipeline = None
 
 def get_emotion_pipeline():
+    """
+    Lazy-load the emotion classification pipeline.
+    Loads the model weights directly from Hugging Face.
+    """
     global _emotion_pipeline
     if _emotion_pipeline is None:
-        if pipeline is None:
-            logger.error("Transformers library not installed. Local model unavailable.")
-            return None
         try:
-            if not os.path.exists(MODEL_PATH):
-                logger.error(f"Local model path not found: {MODEL_PATH}")
-                return None
-            logger.info(f"Loading local emotion model from {MODEL_PATH}...")
-            _emotion_pipeline = pipeline("text-classification", model=MODEL_PATH, top_k=None)
-            logger.info("Local emotion model loaded successfully.")
+            logger.info(f"     📥 Loading model '{MODEL_ID}' from Hugging Face...")
+            _emotion_pipeline = pipeline(
+                "text-classification",
+                model=MODEL_ID,
+                use_auth_token=HF_TOKEN,
+                device=0 if os.getenv("DEVICE") == "cuda" else -1  # -1 for CPU, 0 for GPU
+            )
+            logger.info(f"     ✅ Model loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to load local emotion model: {e}")
-            return None
+            logger.error(f"❌ Failed to load model: {e}")
+            raise
     return _emotion_pipeline
 
-EMOTION_LABELS = [
-    "admiration", "amusement", "anger", "annoyance", "approval", "caring",
-    "confusion", "curiosity", "desire", "disappointment", "disapproval",
-    "disgust", "embarrassment", "excitement", "fear", "gratitude",
-    "grief", "joy", "love", "nervousness", "optimism", "pride",
-    "realization", "relief", "remorse", "sadness", "surprise", "neutral"
-]
-
+# ==========================
+# LABEL MAP
+# ==========================
+id2label = {
+    0: "admiration", 1: "amusement", 2: "anger", 3: "annoyance", 4: "approval", 5: "caring",
+    6: "confusion", 7: "curiosity", 8: "desire", 9: "disappointment", 10: "disapproval", 11: "disgust",
+    12: "embarrassment", 13: "excitement", 14: "fear", 15: "gratitude", 16: "grief", 17: "joy",
+    18: "love", 19: "nervousness", 20: "optimism", 21: "pride", 22: "realization", 23: "relief",
+    24: "remorse", 25: "sadness", 26: "surprise", 27: "neutral"
+}
 
 # ==========================
 # CORE PREDICTION
 # ==========================
-def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
+def predict_emotion(lyrics: str, threshold: float = THRESHOLD) -> Dict:
     """
-    Attempts to get emotion predictions using a local model,
-    falling back to HF Inference API if necessary.
+    Attempts to get emotion predictions using the HF Inference API,
+    falling back to the local model if necessary.
     """
     default_result = {
         "emotions_detected": {},
@@ -67,85 +76,111 @@ def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
     if not lyrics or len(lyrics.strip()) < 15:
         return default_result
 
-    # Use SHA256 of lyrics as cache key
+    # Use SHA256 of lyrics as cache key to minimize inference calls
     lyrics_hash = hashlib.sha256(lyrics.encode('utf-8')).hexdigest()
     cache_key = f"emotion:{lyrics_hash}"
     
     cached = cache_get(cache_key)
     if cached:
-        logger.info(f"     ✅ Found emotion analysis in Redis cache")
+        logger.info(f"     ✅ Found emotion analysis in cache")
         return cached
 
-    # 1. TRY LOCAL MODEL FIRST
-    pipe = get_emotion_pipeline()
-    if pipe:
-        try:
-            logger.info("     🧠 Using LOCAL model for emotion analysis...")
-            # Pipeline returns a list of results
-            raw_scores = pipe(lyrics)
-            if isinstance(raw_scores, list) and len(raw_scores) > 0:
-                scores = raw_scores[0] if isinstance(raw_scores[0], list) else raw_scores
-                
-                emotion_dict = {
-                    item['label']: float(item['score'])
-                    for item in scores
-                }
-                
-                detected = {
-                    k: round(v, 4)
-                    for k, v in emotion_dict.items()
-                    if v >= threshold
-                }
-                
-                detected = dict(sorted(detected.items(), key=lambda x: x[1], reverse=True))
-                emotion_list = list(detected.keys()) if detected else ["neutral"]
-                
-                result = {
-                    "emotions_detected": detected,
-                    "Emotion": emotion_list
-                }
-                cache_set(cache_key, result, ex=2592000)
-                return result
-        except Exception as e:
-            logger.error(f"Local Model Inference Error: {e}")
-
-    # 2. FALLBACK TO HF API
-    logger.info("     🌐 Falling back to HF Inference API...")
     if not HF_TOKEN:
-        logger.warning("HUGGINGFACE_TOKEN not found. Emotion analysis defaulting to 'neutral'.")
+        logger.warning("HUGGINGFACE_TOKEN not found. Emotion detection defaulted to 'neutral'.")
         return default_result
 
+    emotion_dict = None
+
+    # 1. TRY HF INFERENCE API FIRST
+    logger.info(f"     🌐 Calling HF Inference API for model '{MODEL_ID}'...")
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": lyrics, "parameters": {"return_all_scores": True}}
+    
+    # Check if we are calling a custom FastAPI Space or the standard HF API
+    is_custom_space = "hf.space" in API_URL
+    if is_custom_space:
+        payload = {"text": lyrics, "threshold": threshold}
+    else:
+        payload = {"inputs": lyrics, "parameters": {"return_all_scores": True}}
 
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
         
+        # Handle model loading (503 Service Unavailable)
         if response.status_code == 503:
-            logger.info("HF Model is loading, retrying in 5s...")
-            import time
+            logger.info("     ⏳ HF Model is loading, retrying in 5s...")
             time.sleep(5)
             response = requests.post(API_URL, headers=headers, json=payload, timeout=15)
 
         response.raise_for_status()
         predictions = response.json()
         
-        if isinstance(predictions, list) and len(predictions) > 0:
+        # Extract emotion_dict based on response format
+        if isinstance(predictions, dict) and "emotions_detected" in predictions:
+            # Format from custom FastAPI Space
+            emotion_dict = {k: float(v) for k, v in predictions["emotions_detected"].items()}
+            logger.info("     ✅ Received predictions from Custom Space API")
+        elif isinstance(predictions, list) and len(predictions) > 0:
+            # Format from standard Hugging Face Inference API
             scores = predictions[0] if isinstance(predictions[0], list) else predictions
-            
             emotion_dict = {
                 item['label']: float(item['score'])
                 for item in scores
             }
+            logger.info("     ✅ Received predictions from HF Inference API")
+    except Exception as e:
+        logger.error(f"     ❌ HF Inference API Error: {e}")
+
+    # 2. FALLBACK TO LOCAL MODEL IF API FAILED
+    if not emotion_dict and pipeline:
+        try:
+            logger.info(f"     🤖 Falling back to local model inference...")
+            pipe = get_emotion_pipeline()
+            if pipe:
+                predictions = pipe(lyrics, top_k=None)
+                if predictions:
+                    scores = predictions[0] if isinstance(predictions[0], list) else predictions
+                    emotion_dict = {}
+                    for item in scores:
+                        label = item['label']
+                        score = float(item['score'])
+                        # Normalize label (remove LABEL_ prefix if present)
+                        if label.startswith("LABEL_"):
+                            try:
+                                idx = int(label.split("_")[1])
+                                label = id2label.get(idx, label)
+                            except:
+                                pass
+                        emotion_dict[label] = score
+                    logger.info("     ✅ Local model inference successful")
+        except Exception as e:
+            logger.error(f"     ❌ Local Model Inference Error: {e}")
+
+    # PROCESS RESULTS
+    if emotion_dict:
+        try:
+            # Sort all emotions by score descending
+            sorted_emotions = sorted(emotion_dict.items(), key=lambda x: x[1], reverse=True)
             
+            # CUSTOM LOGIC: If neutral > 0.48, drop it and take the next top emotion
+            neutral_score = emotion_dict.get("neutral", 0.0)
+            if neutral_score > 0.48:
+                logger.info(f"     ⚖️ Neutral score {neutral_score:.4f} > 0.48. Dropping neutral.")
+                filtered_emotions = [e for e in sorted_emotions if e[0] != "neutral"]
+            else:
+                filtered_emotions = sorted_emotions
+
+            # Ensure we have at least one emotion after filtering
+            if not filtered_emotions:
+                filtered_emotions = [("neutral", neutral_score)]
+
             detected = {
                 k: round(v, 4)
-                for k, v in emotion_dict.items()
-                if v >= threshold
+                for k, v in filtered_emotions
+                if v >= threshold or (k == filtered_emotions[0][0])
             }
             
             detected = dict(sorted(detected.items(), key=lambda x: x[1], reverse=True))
-            emotion_list = list(detected.keys()) if detected else ["neutral"]
+            emotion_list = list(detected.keys())
             
             result = {
                 "emotions_detected": detected,
@@ -153,17 +188,17 @@ def predict_emotion(lyrics: str, threshold: float = 0.05) -> Dict:
             }
             cache_set(cache_key, result, ex=2592000)
             return result
-            
-    except Exception as e:
-        logger.error(f"HF Inference API Error: {e}")
-    
+        except Exception as e:
+            logger.error(f"     ❌ Error processing emotion results: {e}")
+
     return default_result
 
-import concurrent.futures
 
 # ==========================
 # BATCH PROCESSING
 # ==========================
+import concurrent.futures
+
 def process_emotions_batch(songs: List[Dict]) -> List[Dict]:
     """
     Parallelized emotion detection for a batch of songs.
@@ -180,7 +215,6 @@ def process_song_emotion(song: Dict) -> Dict:
     """
     Enrich one song with emotion data
     """
-
     lyrics = song.get("plain_lyrics", "")
     lyrics_found = song.get("lyrics_found", False)
 
@@ -199,3 +233,12 @@ def process_song_emotion(song: Dict) -> Dict:
         "emotion_analysis": {"emotions_detected": {}},
         "Emotion": ["neutral"]
     }
+
+def refresh_hf_token():
+    """Utility to refresh token from env and reload model (called by pipeline)"""
+    global HF_TOKEN, _emotion_pipeline
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+    _emotion_pipeline = None  # Reset pipeline so it reloads with new token
+    logger.info("     ♻️ Hugging Face token refreshed. Pipeline will reload on next inference.")

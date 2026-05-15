@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+transformers[sentencepiece]
+torch
+pydantic
+safetensors
+protobuf
