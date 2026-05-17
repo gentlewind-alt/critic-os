@@ -1,3 +1,12 @@
+---
+title: Critic OS
+emoji: 🎧
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # 🐱 CRITIC_OS // Sarcastic Music Analyzer
 
 **CRITIC_OS** is a high-performance, AI-driven web application that analyzes your Spotify library and provides brutally honest, sarcastic critiques of your music taste. Built for the modern "audio-elitist," it transforms your listening habits into a series of savage roasts delivered by multiple distinct AI personas.
