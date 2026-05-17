@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 groq_client = Groq(
     api_key=os.getenv("GROQ_API_KEY"),
 )
-GROQ_MODEL = "llama-3.3-70b-versatile"#"meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ==========================
 # JOKES DATASET LOADING
@@ -407,7 +407,6 @@ Start now."""
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8,
             top_p=0.9,
-
             max_tokens=50
         )
         return response.choices[0].message.content.strip()

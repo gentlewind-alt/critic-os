@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Groq client for AI-driven questions
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ==========================
 # PERSONA PROMPTS (QUESTIONS)
@@ -59,11 +59,9 @@ Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyr
 1. NEVER ask "Why" or for an explanation. Frame the question as a psychological confirmation or a behavioral tendency check.
 2. The question must be answerable with a simple confirmation or denial.
 3. Provide two short, personality-driven options (A and B) that represent "Confirmation" and "Denial" (e.g., "Called out" vs "Reach", "Guilty" vs "Not even").
-4. DO NOT repeat themes from the previous interaction context.
-5. If the lyrics are marked as [INSTRUMENTAL], ask a question about the lack of lyrics or the pure musical vibe.
-6. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}, "intent": {{"A": "confirmed", "B": "denied"}}}}
-7. STRICTOR: Ensure the 'question' field contains exactly ONE question mark and NO preamble.
-8. USE the specific emotion words from the Vibe list ({emotions}) instead of generic summaries like 'melancholic'.
+4. Return ONLY a JSON object: {{"question": "...", "options": {{"A": "...", "B": "..."}}, "intent": {{"A": "confirmed", "B": "denied"}}}}
+5. Ensure the 'question' field contains exactly ONE question mark and NO preamble.
+6. USE the specific emotion words from the Vibe list ({emotions}).
 """
 
     try:
@@ -81,7 +79,8 @@ Based on the song "{track}" by {artist} (Vibe: {emotions}) and the following lyr
         # Fallback to a semi-dynamic question if AI fails
         return {
             "question": f"Is this {emotions} vibe actually helping your mood?",
-            "options": {"A": "Yes", "B": "Not really"}
+            "options": {"A": "Yes", "B": "Not really"},
+            "intent": {"A": "confirmed", "B": "denied"}
         }
 
 def generate_profile_ai_question(songs: List[Dict], persona: str = "normal") -> Dict:

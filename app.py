@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 # Load environment variables FIRST before any other imports
 load_dotenv()
 
-from flask import Flask, Response, render_template, request
+from flask import Flask, Response, render_template, request, jsonify
 from flask_session import Session
 import redis
 import json

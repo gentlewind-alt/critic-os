@@ -9,14 +9,14 @@
 *   **Multimodal Roasting:** Choose from 6 distinct AI personas (Normal, Cat, Grandpa, Valley Girl, Gordon Ramsay, and Cyberpunk Hacker).
 *   **Deep Context Analysis:** Integrates **Last.fm** metadata to distinguish between "mainstream basic" and "pretentious hipster" tastes.
 *   **Parallel Enrichment Engine:** High-speed pipeline that fetches lyrics and runs emotion detection (HuggingFace) in parallel, processing playlists in < 6 seconds.
-*   **Continuous Streaming:** Real-time AI response generation using **Groq (Llama-4-Scout)** for an immersive terminal-like experience.
+*   **Continuous Streaming:** Real-time AI response generation using **Groq (Llama-3.3)** for an immersive terminal-like experience.
 *   **Interactive Sessions:** AI asks follow-up questions that dynamically re-ground the roast based on your answers.
 *   **Production Hardened:** Optimized for Vercel Serverless with Redis-backed session management and surgical memory usage.
 
 ## 🛠️ Tech Stack
 
 *   **Backend:** Flask (Python)
-*   **AI/LLM:** Groq (Llama-4-Scout-17B), HuggingFace (Emotion Classification)
+*   **AI/LLM:** Groq (Llama-3.3-70B), HuggingFace (Emotion Classification)
 *   **Data APIs:** Spotify (Spotipy), Last.fm, LRC_LIB (Lyrics)
 *   **Database/Cache:** Redis (Upstash)
 *   **Deployment:** Vercel
@@ -43,9 +43,17 @@ SECRET_KEY=your_flask_secret
 
 ## 📦 Deployment
 
-1.  **Vercel:** The project is configured with `vercel.json`. Simply connect your GitHub repo and add the environment variables.
-2.  **Redis:** Required for session persistence in serverless environments. Use **Upstash Redis** for the best Vercel compatibility.
-3.  **Large Files:** Old datasets are excluded via `.vercelignore` to keep build times fast.
+### 1. Vercel
+The project is configured with `vercel.json`. Simply connect your GitHub repo and add the environment variables.
+
+### 2. Hugging Face Spaces (Recommended)
+1. Create a new **Docker Space** on Hugging Face.
+2. Upload all files (or connect your GitHub).
+3. Add the environment variables in the **Settings** tab.
+4. The app will automatically build using the provided `Dockerfile` and run on port 7860.
+
+### 3. Redis
+Required for session persistence. Use **Upstash Redis** (external) for the best compatibility with both Vercel and HF Spaces.
 
 ## 📜 License
 

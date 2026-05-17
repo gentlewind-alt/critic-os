@@ -5,3 +5,5 @@ venv/
 one-million-reddit-jokes.csv
 mistral-4bit-local/
 .vscode/
+Dockerfile
+Dockerfile_api
